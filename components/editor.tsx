@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Player } from "@remotion/player";
 import {
   ArrowDownToLine, Check, ChevronDown, CircleHelp, Clapperboard, Clock3, FileDown, FileUp, Undo2, Redo2,
   Download, KeyRound, LoaderCircle, Monitor, RefreshCw,
-  Settings2, Sparkles, WandSparkles, X,
+  Settings2, Sparkles, WandSparkles, X, Copy, Layers3, BookmarkPlus, FolderOpen, Trash2,
 } from "lucide-react";
 import { DEFAULT_SPEC, MOTION_PRESETS, PRESET_META, normalizeSpec } from "@/lib/motion-types";
 import type { MotionPreset, MotionSpec } from "@/lib/motion-types";
@@ -39,14 +39,47 @@ export function MotionEditor() {
   const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
   const currentProvider = PROVIDERS.find((item) => item.id === provider) ?? PROVIDERS[0];
-  const frameCount = spec.durationSeconds * 30;
   const [aspect, setAspect] = useState<"16:9" | "9:16" | "1:1">("16:9");
+  const [fps, setFps] = useState<24 | 30 | 60>(30);
+  const frameCount = spec.durationSeconds * fps;
   const [projectName, setProjectName] = useState("Untitled Motion");
   const [history, setHistory] = useState<MotionSpec[]>([]);
   const [future, setFuture] = useState<MotionSpec[]>([]);
+  const [layers, setLayers] = useState({ background: true, graphics: true, typography: true, footer: true });
+  const [savedProjects, setSavedProjects] = useState<{ id: string; name: string; aspect: "16:9" | "9:16" | "1:1"; fps: 24 | 30 | 60; layers: { background: boolean; graphics: boolean; typography: boolean; footer: boolean }; spec: MotionSpec; updatedAt: number }[]>([]);
+  const [customPresets, setCustomPresets] = useState<{ id: string; name: string; spec: MotionSpec }[]>([]);
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [libraryLoaded, setLibraryLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dimensions = aspect === "9:16" ? { width: 1080, height: 1920 } : aspect === "1:1" ? { width: 1080, height: 1080 } : { width: 1920, height: 1080 };
-  const inputProps = useMemo(() => ({ spec }), [spec]);
+  const inputProps = useMemo(() => ({ spec, layers }), [spec, layers]);
+
+  useEffect(() => {
+    try {
+      const projects = localStorage.getItem("motion-studio-projects-v1");
+      const presets = localStorage.getItem("motion-studio-presets-v1");
+      if (projects) {
+        const parsedProjects: unknown = JSON.parse(projects);
+        if (!Array.isArray(parsedProjects)) throw new Error("Saved projects are not a list.");
+        setSavedProjects(parsedProjects.filter((item): item is { id: string; name: string; aspect: "16:9" | "9:16" | "1:1"; fps: 24 | 30 | 60; layers: { background: boolean; graphics: boolean; typography: boolean; footer: boolean }; spec: MotionSpec; updatedAt: number } =>
+          !!item && typeof item === "object" && typeof item.id === "string" && typeof item.name === "string" &&
+          (item.aspect === "16:9" || item.aspect === "9:16" || item.aspect === "1:1") &&
+          !!item.spec && typeof item.spec === "object" && typeof item.updatedAt === "number"
+        ).slice(0, 20));
+      }
+      if (presets) {
+        const parsedPresets: unknown = JSON.parse(presets);
+        if (!Array.isArray(parsedPresets)) throw new Error("Saved presets are not a list.");
+        setCustomPresets(parsedPresets.filter((item): item is { id: string; name: string; spec: MotionSpec } =>
+          !!item && typeof item === "object" && typeof item.id === "string" && typeof item.name === "string" &&
+          !!item.spec && typeof item.spec === "object"
+        ).slice(0, 30));
+      }
+    } catch { setMessage({ type: "error", text: "Saved library could not be read. Exported project files remain unaffected." }); }
+    finally { setLibraryLoaded(true); }
+  }, []);
+  useEffect(() => { if (!libraryLoaded) return; try { localStorage.setItem("motion-studio-projects-v1", JSON.stringify(savedProjects.slice(0, 20))); } catch { setMessage({ type: "error", text: "Local project library is full. Export a project file to keep a backup." }); } }, [savedProjects, libraryLoaded]);
+  useEffect(() => { if (!libraryLoaded) return; try { localStorage.setItem("motion-studio-presets-v1", JSON.stringify(customPresets.slice(0, 30))); } catch { setMessage({ type: "error", text: "Custom preset storage is full." }); } }, [customPresets, libraryLoaded]);
 
   function changeProvider(next: Provider) {
     setProvider(next);
@@ -58,7 +91,11 @@ export function MotionEditor() {
   }
   function undo() { if (!history.length) return; setFuture((items) => [spec, ...items].slice(0, 40)); setSpec(history[history.length - 1]); setHistory((items) => items.slice(0, -1)); }
   function redo() { if (!future.length) return; setHistory((items) => [...items.slice(-39), spec]); setSpec(future[0]); setFuture((items) => items.slice(1)); }
-  function saveProject() { const blob = new Blob([JSON.stringify({ version: 1, name: projectName, aspect, spec }, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = (projectName.trim() || "motion-project").replace(/[^a-z0-9-_]+/gi, "-").toLowerCase() + ".json"; link.click(); URL.revokeObjectURL(url); setMessage({ type: "success", text: "Project file exported." }); }
+  function saveToLibrary(name = projectName) { const cleanName = name.trim().slice(0, 80) || "Untitled Motion"; setSavedProjects((items) => [{ id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now()), name: cleanName, aspect, fps, layers, spec, updatedAt: Date.now() }, ...items.filter((item) => item.name !== cleanName)].slice(0, 20)); setMessage({ type: "success", text: "Project saved to this browser." }); }
+  function duplicateProject() { const nextName = `${projectName.trim() || "Untitled Motion"} copy`.slice(0, 80); setProjectName(nextName); saveToLibrary(nextName); }
+  function saveCustomPreset() { const name = window.prompt("Name this custom motion preset", PRESET_META[spec.preset].name + " custom"); if (!name?.trim()) return; const cleanName = name.trim().slice(0, 40); setCustomPresets((items) => [{ id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now()), name: cleanName, spec }, ...items.filter((item) => item.name !== cleanName)].slice(0, 30)); setMessage({ type: "success", text: "Custom preset saved." }); }
+  function loadSavedProject(item: { name: string; aspect: "16:9" | "9:16" | "1:1"; fps?: 24 | 30 | 60; layers?: { background: boolean; graphics: boolean; typography: boolean; footer: boolean }; spec: MotionSpec }) { setHistory((items) => [...items.slice(-39), spec]); setFuture([]); setSpec(normalizeSpec(item.spec)); setProjectName(item.name); setAspect(item.aspect); if (item.fps === 24 || item.fps === 30 || item.fps === 60) setFps(item.fps); if (item.layers) setLayers(item.layers); setMessage({ type: "success", text: "Saved project restored." }); }
+  function saveProject() { saveToLibrary(); const blob = new Blob([JSON.stringify({ version: 1, name: projectName, aspect, fps, layers, spec }, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = (projectName.trim() || "motion-project").replace(/[^a-z0-9-_]+/gi, "-").toLowerCase() + ".json"; link.click(); URL.revokeObjectURL(url); setMessage({ type: "success", text: "Project file exported." }); }
   async function loadProject(file?: File) {
     if (!file) return;
     try {
@@ -75,7 +112,7 @@ export function MotionEditor() {
         throw new Error("Invalid project file.");
       }
 
-      const data = parsed as { version?: unknown; name?: unknown; aspect?: unknown; spec?: unknown };
+      const data = parsed as { version?: unknown; name?: unknown; aspect?: unknown; fps?: unknown; layers?: unknown; spec?: unknown };
       if (data.version !== 1) throw new Error("Unsupported project version. Import a Motion Generator v1 project.");
       if (!data.spec || typeof data.spec !== "object" || Array.isArray(data.spec)) {
         throw new Error("Project is missing a valid motion spec.");
@@ -105,6 +142,8 @@ export function MotionEditor() {
       setSpec(nextSpec);
       setProjectName(nextName || "Untitled Motion");
       setAspect(data.aspect);
+      if (data.fps === 24 || data.fps === 30 || data.fps === 60) setFps(data.fps);
+      if (data.layers && typeof data.layers === "object" && !Array.isArray(data.layers)) { const savedLayers = data.layers as Record<string, unknown>; setLayers({ background: savedLayers.background !== false, graphics: savedLayers.graphics !== false, typography: savedLayers.typography !== false, footer: savedLayers.footer !== false }); }
       setMessage({ type: "success", text: "Project loaded." });
     } catch (error) {
       setMessage({ type: "error", text: error instanceof Error ? error.message : "Could not load project file." });
@@ -162,7 +201,7 @@ export function MotionEditor() {
           id: "MotionComposition",
           component: MotionComposition,
           durationInFrames: frameCount,
-          fps: 30,
+          fps,
           width: dimensions.width,
           height: dimensions.height,
           defaultProps: inputProps,
@@ -195,7 +234,7 @@ export function MotionEditor() {
           <span className="beta-pill">BETA</span>
         </Link>
         <div className="topbar-center"><span className="live-dot" /> LOCAL PROJECT <span className="topbar-divider">/</span> {projectName.toUpperCase()}</div>
-        <div className="topbar-actions"><button className="button button-quiet" onClick={undo} disabled={!history.length} title="Undo"><Undo2 size={15}/></button><button className="button button-quiet" onClick={redo} disabled={!future.length} title="Redo"><Redo2 size={15}/></button><button className="button button-quiet" onClick={saveProject} title="Save project"><FileDown size={15}/><span>Save</span></button><button className="button button-quiet" onClick={() => fileInputRef.current?.click()} title="Open project"><FileUp size={15}/><span>Open</span></button><input ref={fileInputRef} type="file" accept="application/json,.json" hidden onChange={(event) => { void loadProject(event.target.files?.[0]); event.currentTarget.value = ""; }}/></div>
+        <div className="topbar-actions"><button className="button button-quiet" onClick={undo} disabled={!history.length} title="Undo"><Undo2 size={15}/></button><button className="button button-quiet" onClick={redo} disabled={!future.length} title="Redo"><Redo2 size={15}/></button><button className="button button-quiet" onClick={saveProject} title="Save project"><FileDown size={15}/><span>Save</span></button><button className="button button-quiet" onClick={duplicateProject} title="Duplicate project"><Copy size={15}/><span>Duplicate</span></button><button className="button button-quiet" onClick={() => setShowLibrary((open) => !open)} title="Saved projects"><FolderOpen size={15}/><span>Library</span></button><button className="button button-quiet" onClick={() => fileInputRef.current?.click()} title="Import project file"><FileUp size={15}/><span>Open</span></button><input ref={fileInputRef} type="file" accept="application/json,.json" hidden onChange={(event) => { void loadProject(event.target.files?.[0]); event.currentTarget.value = ""; }}/></div>
         <div className="topbar-actions">
           <button className="button button-quiet button-settings" onClick={() => setSettingsOpen((open) => !open)}><KeyRound size={15} /> <span>AI settings</span> <ChevronDown size={13} /></button>
           <button className="button button-primary export-button" onClick={exportVideo} disabled={exporting}>
@@ -205,6 +244,7 @@ export function MotionEditor() {
         </div>
       </header>
 
+      {showLibrary && <section className="project-library" aria-label="Saved projects"><div className="project-library-head"><div><span className="eyebrow">LOCAL LIBRARY</span><strong>Saved projects</strong></div><button className="icon-button" onClick={() => setShowLibrary(false)} aria-label="Close library"><X size={15}/></button></div>{savedProjects.length ? savedProjects.map((item) => <div className="saved-project-row" key={item.id}><button className="saved-project-load" onClick={() => loadSavedProject(item)}><strong>{item.name}</strong><span>{item.aspect} · {new Date(item.updatedAt).toLocaleString()}</span></button><button className="icon-button" aria-label={`Delete ${item.name}`} onClick={() => setSavedProjects((items) => items.filter((saved) => saved.id !== item.id))}><Trash2 size={13}/></button></div>) : <p className="muted small">Save a project to keep a local snapshot here.</p>}</section>}
       <div className="workspace">
         <aside className="left-panel">
           <div className="panel-heading">
@@ -213,7 +253,7 @@ export function MotionEditor() {
           </div>
           <p className="muted intro-copy">Describe the feeling. Let AI shape the first frame, then fine-tune the details.</p>
 
-          <div className="field-label-row"><label htmlFor="prompt">Your idea</label><span className="tiny-count">{prompt.length}/1200</span></div>
+          <div className="field-label-row"><label htmlFor="prompt">Your idea</label><button className="button button-small" onClick={() => setPrompt((value) => { const brief = value.trim().replace(/[.\s]+$/, ""); const guidance = "Create a polished motion graphic with a clear visual hierarchy, intentional negative space, strong typography, cohesive colors, and a readable opening-to-ending sequence. Avoid clutter and keep the main message legible at mobile size."; return (brief ? `${brief}. ${guidance}` : guidance).slice(0, 1200); })}>Improve brief</button><span className="tiny-count">{prompt.length}/1200</span></div>
           <textarea id="prompt" value={prompt} maxLength={1200} onChange={(event) => setPrompt(event.target.value)} className="prompt-input" placeholder="A bold launch animation for…"/>
           <div className="starter-row">
             {STARTER_PROMPTS.slice(0, 3).map((item) => (
@@ -265,12 +305,16 @@ export function MotionEditor() {
             ))}
           </div>
 
+          <label className="control-label" htmlFor="output-fps">Frame rate</label><select id="output-fps" className="control-input" value={fps} onChange={(event) => setFps(Number(event.target.value) as 24 | 30 | 60)}><option value={24}>24 FPS · Cinematic</option><option value={30}>30 FPS · Social</option><option value={60}>60 FPS · Smooth</option></select>
+          <div className="section-divider" />
+          <div className="section-title"><span className="eyebrow">CUSTOM PRESETS</span><button className="button button-small" onClick={saveCustomPreset}><BookmarkPlus size={12}/> Save current</button></div>
+          {customPresets.length > 0 ? <div className="custom-preset-list">{customPresets.map((item) => <div className="custom-preset-row" key={item.id}><button className="custom-preset-load" onClick={() => { setHistory((items) => [...items.slice(-39), spec]); setFuture([]); setSpec(normalizeSpec(item.spec)); setMessage({ type: "success", text: `Preset “${item.name}” applied.` }); }}><span>{item.name}</span><small>{PRESET_META[item.spec.preset].name}</small></button><button className="icon-button" aria-label={`Delete ${item.name}`} onClick={() => setCustomPresets((items) => items.filter((preset) => preset.id !== item.id))}><Trash2 size={13}/></button></div>)}</div> : <p className="muted small">Save a style you like to reuse it later.</p>}
           <div className="section-divider" />
           <div className="section-title"><span className="eyebrow">04 / CANVAS</span><span className="muted small">Aspect ratio</span></div>
           <div className="aspect-grid" role="group" aria-label="Canvas aspect ratio">
             {(["16:9", "9:16", "1:1"] as const).map((ratio) => <button key={ratio} className={"aspect-button " + (aspect === ratio ? "active" : "")} onClick={() => setAspect(ratio)} aria-pressed={aspect === ratio}><span className={"aspect-icon aspect-" + ratio.replace(":", "-")} />{ratio}</button>)}
           </div>
-          <div className="canvas-chip"><Monitor size={15} /><span>{dimensions.width} × {dimensions.height}</span><span className="canvas-fps">30 FPS</span></div>
+          <div className="canvas-chip"><Monitor size={15} /><span>{dimensions.width} × {dimensions.height}</span><span className="canvas-fps">{fps} FPS</span></div>
           <label className="range-label" htmlFor="duration"><span>Duration</span><strong>{spec.durationSeconds}s</strong></label>
           <input id="duration" type="range" min="4" max="15" value={spec.durationSeconds} onChange={(event) => update("durationSeconds", Number(event.target.value))} className="range-input"/>
         </aside>
@@ -285,7 +329,7 @@ export function MotionEditor() {
                 durationInFrames={frameCount}
                 compositionWidth={dimensions.width}
                 compositionHeight={dimensions.height}
-                fps={30}
+                fps={fps}
                 controls
                 clickToPlay
                 doubleClickToFullscreen
@@ -301,7 +345,7 @@ export function MotionEditor() {
             <div className="track-row"><div className="track-label">MOTION</div><div className="track-lane"><div className="track-clip" style={{ width: "100%" }}><span>Intro / {PRESET_META[spec.preset].name}</span><span className="track-clip-end">{spec.durationSeconds}s</span></div></div></div>
             <div className="track-row"><div className="track-label">TYPE</div><div className="track-lane"><div className="track-clip track-clip-type" style={{ width: "76%" }}><span>{spec.title || "Untitled"}</span></div></div></div>
             <div className="track-row"><div className="track-label">KEYFRAME</div><div className="track-lane"><div className="track-clip track-clip-type" style={{ width: Math.min(100, spec.titleStartFrame / Math.max(1, frameCount) * 100) + "%", minWidth: 5 }}><span>Title start · frame {spec.titleStartFrame}</span></div></div></div>
-          <div className="timeline-bottom"><span><Clock3 size={12}/> 30 frames / second</span><span>Composition updates live <span className="live-dot" /></span></div>
+          <div className="timeline-bottom"><span><Clock3 size={12}/> {fps} frames / second</span><span>Composition updates live <span className="live-dot" /></span></div>
           </div>
         </section>
 
@@ -341,11 +385,21 @@ export function MotionEditor() {
             <input id="title-travel" className="range-input" type="range" min="0" max="160" step="4" value={spec.titleTravel} onChange={(event) => update("titleTravel", Number(event.target.value))} />
             <p className="settings-hint">Adjust the title entrance timing and travel distance.</p>
           </div>
+          <div className="property-section">
+            <span className="property-heading">Keyframe easing</span>
+            <label className="control-label" htmlFor="title-easing">Title entrance curve</label>
+            <select id="title-easing" className="control-input" value={spec.titleEasing} onChange={(event) => update("titleEasing", event.target.value as MotionSpec["titleEasing"])}><option value="spring">Spring</option><option value="ease-out">Ease out</option><option value="ease-in">Ease in</option><option value="linear">Linear</option></select>
+            <p className="settings-hint">The preview and export use the same curve.</p>
+          </div>
+          <div className="property-section">
+            <span className="property-heading">Layer visibility</span>
+            {([{ key: "background", label: "Background & grid" }, { key: "graphics", label: "Motion graphics" }, { key: "typography", label: "Title & subtitle" }, { key: "footer", label: "Footer details" }] as const).map(({ key, label }) => <label className="layer-toggle" key={key}><input type="checkbox" checked={layers[key]} onChange={(event) => setLayers((current) => ({ ...current, [key]: event.target.checked }))}/><span>{label}</span><Layers3 size={13}/></label>)}
+          </div>
           <div className="property-section motion-summary">
             <span className="property-heading">Motion settings</span>
             <div className="summary-row"><span>Direction</span><strong>{PRESET_META[spec.preset].name}</strong></div>
             <div className="summary-row"><span>Duration</span><strong>{spec.durationSeconds} seconds</strong></div>
-            <div className="summary-row"><span>Frame rate</span><strong>30 FPS</strong></div>
+            <div className="summary-row"><span>Frame rate</span><strong>{fps} FPS</strong></div>
             <div className="summary-row"><span>Format</span><strong>MP4 · H.264</strong></div>
           </div>
           <button className="button button-primary button-full" onClick={exportVideo} disabled={exporting}>
