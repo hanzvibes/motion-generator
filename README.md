@@ -43,12 +43,12 @@ npm run build
 
 ## BYOK privacy
 
-- The API key and custom endpoint are held in in-memory UI state and are not placed in local storage, cookies, a database, or application logs.
+- The API key is held in in-memory UI state only and is not saved to local storage, cookies, a database, or application logs. Provider, model, and custom endpoint preferences are saved to this browser only when the user explicitly chooses Save settings.
 - When generating a composition, the key is sent to this app's same-origin API route and used to authenticate a single provider request.
 - The route does not deliberately log request bodies or provider exceptions; provider error details are replaced with a generic message.
 - Custom endpoints must use HTTPS, resolve only to public IP addresses, and cannot redirect requests. The server rechecks DNS before requests and blocks common non-public IPv4/IPv6 ranges, but DNS rebinding and infrastructure-level risks cannot be ruled out completely. Only use endpoints you control or trust.
 - This is not a guarantee that the AI provider itself won't process request data. Review your provider's terms and policies.
-- Do not paste keys into prompts. Clear the key in AI settings when finished; refreshing the page also clears it.
+- API keys saved by older versions are removed from local storage when the editor next loads. Do not paste keys into prompts. Clear the key in AI settings when finished; refreshing the page also clears it.
 
 ## Provider compatibility notes
 
@@ -73,3 +73,16 @@ This project uses Remotion. Review [Remotion's license and terms](https://www.re
 - **Undo/redo:** history controls cover composition-spec edits.
 
 The Social Media Canvas supports landscape (16:9), portrait (9:16), and square (1:1) output. Export remains browser/device-based; format and codec availability depend on browser support.
+
+
+## Independent Remotion composition engine
+
+- AI composition uses a scene graph rather than depending on the four legacy visual presets.
+- The editor supports up to 256 positioned elements and up to 20 timed scenes per project as practical safety bounds.
+- Elements include text, rectangles, circles, ellipses, lines, triangles, and custom SVG vector paths.
+- Per-element controls include position, size, timing, fill and gradient colors, stroke, opacity, rotation, blur, layer assignment, ordering, and entrance motion.
+- Canvas edit mode lets you drag elements to reposition them or use arrow keys to nudge the selected element. Element timing is visible as selectable clips in the timeline.
+- Entrance motion includes fade, rise, scale, zoom, drift, horizontal slides, rotate-in, and bounce.
+- Element coordinates are percentages of the canvas, so compositions adapt to landscape, portrait, and square output. Preview and browser export share the same Remotion composition component.
+- Rendering runs locally in the browser; no third-party video-rendering service or remote asset library is required. An AI provider is only needed to generate or revise a composition. Existing projects without a scene graph continue to use the legacy preset renderer.
+- “Independent” does not mean literally unlimited: browser memory, device performance, codec support, export duration, the element/scene safety bounds, and Remotion's own runtime/license remain practical limits.

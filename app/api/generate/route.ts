@@ -17,10 +17,24 @@ const requestSchema = z.object({
   apiKey: z.string().max(512).optional().default(""),
   baseURL: z.string().trim().max(500).optional(),
   model: z.string().trim().min(2).max(100),
-  prompt: z.string().trim().min(3).max(1200),
+  prompt: z.string().trim().min(3).max(20000),
+  currentSpec: z.unknown().optional(),
 });
 
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+const elementSchema = z.object({
+  id: z.string().min(1).max(48),
+  type: z.enum(["text", "rect", "circle", "ellipse", "line", "triangle", "path"]),
+  x: z.number().min(-20).max(120), y: z.number().min(-20).max(120),
+  width: z.number().min(0).max(120), height: z.number().min(0).max(120),
+  color: hex, text: z.string().max(500).optional(), fontSize: z.number().min(8).max(180).optional(),
+  pathData: z.string().max(2000).optional(), strokeColor: hex.optional(), strokeWidth: z.number().min(0).max(24).optional(),
+  borderRadius: z.number().min(0).max(100).optional(), blur: z.number().min(0).max(40).optional(), gradientTo: hex.optional(), gradientAngle: z.number().min(0).max(360).optional(),
+  layer: z.enum(["graphics", "typography"]).optional(),
+  rotation: z.number().min(-360).max(360).optional(), opacity: z.number().min(0).max(1).optional(),
+  startSeconds: z.number().min(0).max(60).optional(), endSeconds: z.number().min(0).max(60).optional(),
+  motion: z.enum(["fade", "rise", "scale", "drift", "slide-left", "slide-right", "rotate", "bounce", "zoom", "none"]).optional(),
+});
 const motionSchema = z.object({
   eyebrow: z.string().min(1).max(54),
   title: z.string().min(1).max(80),
@@ -29,9 +43,21 @@ const motionSchema = z.object({
   accent: hex,
   secondary: hex,
   preset: z.enum(MOTION_PRESETS),
-  durationSeconds: z.number().int().min(4).max(15),
+  durationSeconds: z.number().int().min(4).max(60),
   titleStartFrame: z.number().int().min(0).max(120),
   titleTravel: z.number().int().min(0).max(160),
+  elements: z.array(elementSchema).min(1).max(256),
+  scenes: z.array(z.object({
+    title: z.string().min(1).max(80),
+    subtitle: z.string().max(150),
+    eyebrow: z.string().min(1).max(54),
+    startSeconds: z.number().min(0).max(59.5),
+    endSeconds: z.number().min(0.5).max(60),
+    preset: z.enum(MOTION_PRESETS),
+    accent: hex,
+    secondary: hex,
+    titleTravel: z.number().min(0).max(160),
+  })).max(20).optional(),
 });
 
 function isPublicIPv4(address: string): boolean {
@@ -118,6 +144,7 @@ export async function POST(request: Request) {
     }
   }
 
+  let stage: "provider" | "parse" | "validate" = "provider";
   try {
     const customFetch: typeof fetch = async (input, init) => {
       const target = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
@@ -144,20 +171,20 @@ export async function POST(request: Request) {
             : createGoogleGenerativeAI({ apiKey: body.apiKey })(body.model);
 
     const system = buildSystemPrompt();
-    const prompt = buildUserPrompt(body.prompt);
-
-        let validated: z.infer<typeof motionSchema>;
+    const prompt = buildUserPrompt(body.prompt, body.currentSpec);
+    let validated: z.infer<typeof motionSchema>;
     if (body.provider === "custom") {
-      // Some OpenAI-compatible gateways do not support the structured-output
-      // protocol used by Output.object(). Request plain text JSON and validate
-      // it locally before using it.
-      const result = await generateText({ model, maxOutputTokens: 900, system, prompt });
+      // OpenAI-compatible gateways vary in support for structured output, so
+      // request plain text and validate the returned JSON locally.
+      const result = await generateText({ model, maxOutputTokens: 6000, system, prompt });
+      stage = "parse";
       const parsed = parseJsonObject(result.text);
+      stage = "validate";
       validated = motionSchema.parse(parsed);
     } else {
       const result = await generateText({
         model,
-        maxOutputTokens: 900,
+        maxOutputTokens: 2400,
         output: Output.object({ schema: motionSchema }),
         system,
         prompt,
@@ -168,13 +195,41 @@ export async function POST(request: Request) {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
-    // Do not log the thrown provider error; SDK errors may contain request metadata.
-    const message = error instanceof Error ? error.message : "";
-    const status = /api.?key|unauthorized|authentication|invalid.?token/i.test(message) ? 401 : 502;
+    // Never return raw provider bodies or log SDK errors: they may contain
+    // sensitive request metadata. Return a safe diagnostic instead.
+    if (typeof stage !== "undefined" && stage === "parse") {
+      return NextResponse.json({
+        error: "The provider responded, but its reply was not valid JSON. Try a model that supports text generation, or a shorter prompt.",
+        diagnostic: "invalid_provider_json",
+      }, { status: 502, headers: { "Cache-Control": "no-store" } });
+    }
+    if (typeof stage !== "undefined" && stage === "validate") {
+      return NextResponse.json({
+        error: "The provider returned JSON, but required motion fields were missing or out of range. Try again or use a model with stronger JSON instruction following.",
+        diagnostic: "invalid_composition_schema",
+      }, { status: 502, headers: { "Cache-Control": "no-store" } });
+    }
+
+    const candidate = error && typeof error === "object" ? error as { statusCode?: unknown; status?: unknown; message?: unknown } : {};
+    const providerStatus = Number(candidate.statusCode ?? candidate.status);
+    let status = 502;
+    let errorMessage = "The provider request failed. Check the model ID, provider access, credits, and gateway compatibility.";
+    if (providerStatus === 401 || providerStatus === 403) {
+      status = providerStatus;
+      errorMessage = "The provider rejected the API key or denied access to this model. Check the key and model permissions.";
+    } else if (providerStatus === 404) {
+      status = 502;
+      errorMessage = "The provider endpoint or model was not found. Check the custom base URL and exact model ID.";
+    } else if (providerStatus === 400 || providerStatus === 422) {
+      errorMessage = "The provider rejected the request format. This gateway may not fully support the OpenAI Chat Completions API.";
+    } else if (providerStatus === 429) {
+      errorMessage = "The provider rate-limited this request or the account has insufficient quota/credits.";
+    } else if (providerStatus >= 500 && providerStatus <= 599) {
+      errorMessage = "The provider or gateway returned a server error. Check its status page or request logs.";
+    }
     return NextResponse.json({
-      error: status === 401
-        ? "The provider rejected this API key. Check it and try again."
-        : "The AI provider could not generate a composition. Check the model ID, provider credits, and API access.",
+      error: errorMessage,
+      diagnostic: Number.isFinite(providerStatus) && providerStatus > 0 ? `provider_http_${providerStatus}` : "provider_request_failed",
     }, { status, headers: { "Cache-Control": "no-store" } });
   }
 }
