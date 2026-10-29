@@ -246,7 +246,8 @@ export function MotionEditor() {
             <div className="timeline-ruler"><span>00:00</span><span>00:02</span><span>00:04</span><span>00:06</span><span>{String(spec.durationSeconds).padStart(2, "0")}:00</span></div>
             <div className="track-row"><div className="track-label">MOTION</div><div className="track-lane"><div className="track-clip" style={{ width: "100%" }}><span>Intro / {PRESET_META[spec.preset].name}</span><span className="track-clip-end">{spec.durationSeconds}s</span></div></div></div>
             <div className="track-row"><div className="track-label">TYPE</div><div className="track-lane"><div className="track-clip track-clip-type" style={{ width: "76%" }}><span>{spec.title || "Untitled"}</span></div></div></div>
-            <div className="timeline-bottom"><span><Clock3 size={12}/> 30 frames / second</span><span>Composition updates live <span className="live-dot" /></span></div>
+            <div className="track-row"><div className="track-label">KEYFRAME</div><div className="track-lane"><div className="track-clip track-clip-type" style={{ width: Math.min(100, spec.titleStartFrame / Math.max(1, frameCount) * 100) + "%", minWidth: 5 }}><span>Title start · frame {spec.titleStartFrame}</span></div></div></div>
+          <div className="timeline-bottom"><span><Clock3 size={12}/> 30 frames / second</span><span>Composition updates live <span className="live-dot" /></span></div>
           </div>
         </section>
 
@@ -277,6 +278,14 @@ export function MotionEditor() {
                 <input id={`color-${key}`} type="color" value={spec[key]} onChange={(event) => update(key, event.target.value)} aria-label={label + " color"} />
               </label>
             ))}
+          </div>
+          <div className="property-section">
+            <span className="property-heading">Title keyframes</span>
+            <label className="range-label" htmlFor="title-start-frame"><span>Entrance frame</span><strong>{spec.titleStartFrame}f / {frameCount}f</strong></label>
+            <input id="title-start-frame" className="range-input" type="range" min="0" max={Math.min(120, Math.max(0, frameCount - 1))} step="1" value={Math.min(spec.titleStartFrame, Math.min(120, Math.max(0, frameCount - 1)))} onChange={(event) => update("titleStartFrame", Number(event.target.value))} />
+            <label className="range-label" htmlFor="title-travel"><span>Entrance travel</span><strong>{spec.titleTravel}px</strong></label>
+            <input id="title-travel" className="range-input" type="range" min="0" max="160" step="4" value={spec.titleTravel} onChange={(event) => update("titleTravel", Number(event.target.value))} />
+            <p className="settings-hint">Adjust the title entrance timing and travel distance.</p>
           </div>
           <div className="property-section motion-summary">
             <span className="property-heading">Motion settings</span>
