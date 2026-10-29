@@ -62,3 +62,14 @@ Video rendering happens on the user's device. Keep the page open during export, 
 ## License
 
 This project uses Remotion. Review [Remotion's license and terms](https://www.remotion.dev/license) and confirm your usage qualifies before releasing a public commercial app. Other dependencies retain their respective licenses.
+
+
+## Editing workflow features
+
+- **Local project library:** save snapshots, restore older versions, duplicate a project, or export/import portable JSON files. The library is stored in this browser only; clearing site data removes it. API keys are never included in project snapshots.
+- **Custom motion presets:** save the current composition as a reusable preset and apply or delete it later. Presets are local to the current browser.
+- **Layer visibility:** toggle the background/grid, motion graphics, typography, and footer independently. These visibility choices affect both preview and browser export.
+- **Title easing:** choose Spring, Ease In, Ease Out, or Linear for the title entrance. The preview and export share the same composition logic.
+- **Undo/redo:** history controls cover composition-spec edits.
+
+The Social Media Canvas supports landscape (16:9), portrait (9:16), and square (1:1) output. Export remains browser/device-based; format and codec availability depend on browser support.
