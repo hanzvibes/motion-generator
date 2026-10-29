@@ -28,13 +28,10 @@ test("parses JSON in a markdown fence", () => {
   assert.deepEqual(parseJsonObject('```json\n{"title":"Hello"}\n```'), { title: "Hello" });
 });
 
-test("extracts one object from provider prose and preserves braces in strings", () => {
-  assert.deepEqual(parseJsonObject('Result follows: {"title":"A {better} idea","subtitle":"say \\"go\\""} done.'), {
-    title: "A {better} idea",
-    subtitle: 'say "go"',
-  });
+test("extracts one object from provider prose and preserves braces and quotes in strings", () => {
+  const expected = { title: "A {better} idea", subtitle: 'say "go"' };
+  assert.deepEqual(parseJsonObject("Result follows: " + JSON.stringify(expected) + " done."), expected);
 });
-
 test("rejects missing, malformed, and non-object JSON", () => {
   for (const value of ["", "no json", '{"title":', '[1,2,3]', 'null']) {
     assert.throws(() => parseJsonObject(value), { message: "invalid_model_json" });
