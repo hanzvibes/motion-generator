@@ -59,7 +59,59 @@ export function MotionEditor() {
   function undo() { if (!history.length) return; setFuture((items) => [spec, ...items].slice(0, 40)); setSpec(history[history.length - 1]); setHistory((items) => items.slice(0, -1)); }
   function redo() { if (!future.length) return; setHistory((items) => [...items.slice(-39), spec]); setSpec(future[0]); setFuture((items) => items.slice(1)); }
   function saveProject() { const blob = new Blob([JSON.stringify({ version: 1, name: projectName, aspect, spec }, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = (projectName.trim() || "motion-project").replace(/[^a-z0-9-_]+/gi, "-").toLowerCase() + ".json"; link.click(); URL.revokeObjectURL(url); setMessage({ type: "success", text: "Project file exported." }); }
-  async function loadProject(file?: File) { if (!file) return; try { if (file.size > 1000000) throw new Error("Project file is too large."); const data = JSON.parse(await file.text()) as { name?: unknown; aspect?: unknown; spec?: unknown }; if (!data.spec || typeof data.spec !== "object") throw new Error("Invalid project file."); setHistory((items) => [...items.slice(-39), spec]); setFuture([]); setSpec(normalizeSpec(data.spec as Partial<MotionSpec>)); if (typeof data.name === "string") setProjectName(data.name.slice(0, 80)); if (data.aspect === "16:9" || data.aspect === "9:16" || data.aspect === "1:1") setAspect(data.aspect); setMessage({ type: "success", text: "Project loaded." }); } catch (error) { setMessage({ type: "error", text: error instanceof Error ? error.message : "Could not load project file." }); } }
+  async function loadProject(file?: File) {
+    if (!file) return;
+    try {
+      if (file.size === 0) throw new Error("Project file is empty.");
+      if (file.size > 1_000_000) throw new Error("Project file is too large (max 1 MB).");
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(await file.text());
+      } catch {
+        throw new Error("Project file is not valid JSON.");
+      }
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("Invalid project file.");
+      }
+
+      const data = parsed as { version?: unknown; name?: unknown; aspect?: unknown; spec?: unknown };
+      if (data.version !== 1) throw new Error("Unsupported project version. Import a Motion Generator v1 project.");
+      if (!data.spec || typeof data.spec !== "object" || Array.isArray(data.spec)) {
+        throw new Error("Project is missing a valid motion spec.");
+      }
+      const rawSpec = data.spec as Record<string, unknown>;
+      const requiredTextFields = ["eyebrow", "title", "subtitle", "background", "accent", "secondary", "preset"];
+      if (requiredTextFields.some((key) => typeof rawSpec[key] !== "string") ||
+          typeof rawSpec.durationSeconds !== "number" ||
+          !Number.isFinite(rawSpec.durationSeconds) ||
+          typeof rawSpec.titleStartFrame !== "number" ||
+          !Number.isFinite(rawSpec.titleStartFrame) ||
+          typeof rawSpec.titleTravel !== "number" ||
+          !Number.isFinite(rawSpec.titleTravel)) {
+        throw new Error("Project motion spec is incomplete or has invalid field types.");
+      }
+      if (data.aspect !== "16:9" && data.aspect !== "9:16" && data.aspect !== "1:1") {
+        throw new Error("Project has an unsupported canvas ratio.");
+      }
+      if (data.name !== undefined && typeof data.name !== "string") {
+        throw new Error("Project name must be text.");
+      }
+
+      const nextSpec = normalizeSpec(data.spec as Partial<MotionSpec>);
+      const nextName = typeof data.name === "string" ? data.name.trim().slice(0, 80) : "Untitled Motion";
+      setHistory((items) => [...items.slice(-39), spec]);
+      setFuture([]);
+      setSpec(nextSpec);
+      setProjectName(nextName || "Untitled Motion");
+      setAspect(data.aspect);
+      setMessage({ type: "success", text: "Project loaded." });
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "Could not load project file." });
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
   function applyTemplate(template: "launch" | "social" | "minimal") { const templates = { launch: { ...DEFAULT_SPEC, eyebrow: "NEW RELEASE / 2026", title: "Made to stand out.", subtitle: "A new perspective starts here.", preset: "neon" as MotionPreset, accent: "#c6ff55", secondary: "#8b7cff" }, social: { ...DEFAULT_SPEC, eyebrow: "CREATOR SERIES / 001", title: "Make some noise.", subtitle: "Ideas worth stopping for.", preset: "kinetic" as MotionPreset, accent: "#ff765d", secondary: "#ffd166" }, minimal: { ...DEFAULT_SPEC, eyebrow: "STUDIO NOTES / 001", title: "Less, but better.", subtitle: "Clarity in every frame.", preset: "editorial" as MotionPreset, background: "#e9e7dd", accent: "#272822", secondary: "#9eaa87" } }; setHistory((items) => [...items.slice(-39), spec]); setFuture([]); setSpec(normalizeSpec(templates[template])); setMessage({ type: "success", text: "Template applied." }); }
 
   async function generate() {
