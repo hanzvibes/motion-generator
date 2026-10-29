@@ -46,7 +46,7 @@ npm run build
 - The API key and custom endpoint are held in in-memory UI state and are not placed in local storage, cookies, a database, or application logs.
 - When generating a composition, the key is sent to this app's same-origin API route and used to authenticate a single provider request.
 - The route does not deliberately log request bodies or provider exceptions; provider error details are replaced with a generic message.
-- Custom endpoints must use HTTPS and cannot target common localhost/private-network addresses. Only enter endpoints you trust; this is not a guarantee against every DNS or network-level attack.
+- Custom endpoints must use HTTPS, resolve only to public IP addresses, and cannot redirect requests. The server rechecks DNS before requests and blocks common non-public IPv4/IPv6 ranges, but DNS rebinding and infrastructure-level risks cannot be ruled out completely. Only use endpoints you control or trust.
 - This is not a guarantee that the AI provider itself won't process request data. Review your provider's terms and policies.
 - Do not paste keys into prompts. Clear the key in AI settings when finished; refreshing the page also clears it.
 
