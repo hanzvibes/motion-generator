@@ -297,7 +297,7 @@ export function MotionEditor() {
           <div className="aspect-grid" role="group" aria-label="Canvas aspect ratio">
             {(["16:9", "9:16", "1:1"] as const).map((ratio) => <button key={ratio} className={"aspect-button " + (aspect === ratio ? "active" : "")} onClick={() => setAspect(ratio)} aria-pressed={aspect === ratio}><span className={"aspect-icon aspect-" + ratio.replace(":", "-")} />{ratio}</button>)}
           </div>
-          <div className="canvas-chip"><Monitor size={15} /><span>{dimensions.width} × {dimensions.height}</span><span className="canvas-fps">30 FPS</span></div>
+          <div className="canvas-chip"><Monitor size={15} /><span>{dimensions.width} × {dimensions.height}</span><span className="canvas-fps">{fps} FPS</span></div>
           <label className="range-label" htmlFor="duration"><span>Duration</span><strong>{spec.durationSeconds}s</strong></label>
           <input id="duration" type="range" min="4" max="15" value={spec.durationSeconds} onChange={(event) => update("durationSeconds", Number(event.target.value))} className="range-input"/>
         </aside>
@@ -382,7 +382,7 @@ export function MotionEditor() {
             <span className="property-heading">Motion settings</span>
             <div className="summary-row"><span>Direction</span><strong>{PRESET_META[spec.preset].name}</strong></div>
             <div className="summary-row"><span>Duration</span><strong>{spec.durationSeconds} seconds</strong></div>
-            <div className="summary-row"><span>Frame rate</span><strong>30 FPS</strong></div>
+            <div className="summary-row"><span>Frame rate</span><strong>{fps} FPS</strong></div>
             <div className="summary-row"><span>Format</span><strong>MP4 · H.264</strong></div>
           </div>
           <button className="button button-primary button-full" onClick={exportVideo} disabled={exporting}>
