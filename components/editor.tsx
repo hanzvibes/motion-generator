@@ -174,6 +174,7 @@ export function MotionEditor() {
               <label className="control-label" htmlFor="api-key">API key {provider === "custom" ? "(optional if endpoint needs no auth)" : ""}</label>
               <input id="api-key" type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} className="control-input" placeholder={provider === "custom" ? "API key / bearer token (if required)" : "Paste your API key"} autoComplete="off" spellCheck={false}/>
               <p className="settings-hint">{currentProvider.hint}. The key is only sent with a generation request and is not saved by this app.</p>
+              <p className="settings-hint">Antigravity users: choose Google Gemini API with an AI Studio key. ChatGPT/Codex account sign-in is not available in this build; use an OpenAI API key for now.</p>
               <div className="settings-foot"><span><span className="status-dot" /> Request-only</span><button className="button button-small" onClick={() => { setApiKey(""); setMessage({ type: "info", text: "API key cleared from this page." }); }}>Clear key</button></div>
             </section>
           )}
