@@ -11,6 +11,8 @@ export type MotionSpec = {
   secondary: string;
   preset: MotionPreset;
   durationSeconds: number;
+  titleStartFrame: number;
+  titleTravel: number;
 };
 
 export const DEFAULT_SPEC: MotionSpec = {
@@ -22,6 +24,8 @@ export const DEFAULT_SPEC: MotionSpec = {
   secondary: "#8b7cff",
   preset: "kinetic",
   durationSeconds: 8,
+  titleStartFrame: 0,
+  titleTravel: 54,
 };
 
 export const PRESET_META: Record<MotionPreset, { name: string; description: string }> = {
@@ -49,5 +53,7 @@ export function normalizeSpec(input: Partial<MotionSpec>): MotionSpec {
     durationSeconds: Number.isFinite(input.durationSeconds)
       ? Math.min(15, Math.max(4, Math.round(input.durationSeconds as number)))
       : DEFAULT_SPEC.durationSeconds,
+    titleStartFrame: Number.isFinite(input.titleStartFrame) ? Math.min(120, Math.max(0, Math.round(input.titleStartFrame as number))) : DEFAULT_SPEC.titleStartFrame,
+    titleTravel: Number.isFinite(input.titleTravel) ? Math.min(160, Math.max(0, Math.round(input.titleTravel as number))) : DEFAULT_SPEC.titleTravel,
   };
 }
