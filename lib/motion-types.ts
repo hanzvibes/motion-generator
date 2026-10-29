@@ -13,6 +13,7 @@ export type MotionSpec = {
   durationSeconds: number;
   titleStartFrame: number;
   titleTravel: number;
+  titleEasing: "spring" | "ease-in" | "ease-out" | "linear";
 };
 
 export const DEFAULT_SPEC: MotionSpec = {
@@ -26,6 +27,7 @@ export const DEFAULT_SPEC: MotionSpec = {
   durationSeconds: 8,
   titleStartFrame: 0,
   titleTravel: 54,
+  titleEasing: "spring",
 };
 
 export const PRESET_META: Record<MotionPreset, { name: string; description: string }> = {
@@ -55,5 +57,6 @@ export function normalizeSpec(input: Partial<MotionSpec>): MotionSpec {
       : DEFAULT_SPEC.durationSeconds,
     titleStartFrame: Number.isFinite(input.titleStartFrame) ? Math.min(120, Math.max(0, Math.round(input.titleStartFrame as number))) : DEFAULT_SPEC.titleStartFrame,
     titleTravel: Number.isFinite(input.titleTravel) ? Math.min(160, Math.max(0, Math.round(input.titleTravel as number))) : DEFAULT_SPEC.titleTravel,
+    titleEasing: input.titleEasing === "ease-in" || input.titleEasing === "ease-out" || input.titleEasing === "linear" || input.titleEasing === "spring" ? input.titleEasing : DEFAULT_SPEC.titleEasing,
   };
 }
