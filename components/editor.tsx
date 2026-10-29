@@ -58,8 +58,23 @@ export function MotionEditor() {
     try {
       const projects = localStorage.getItem("motion-studio-projects-v1");
       const presets = localStorage.getItem("motion-studio-presets-v1");
-      if (projects) setSavedProjects(JSON.parse(projects));
-      if (presets) setCustomPresets(JSON.parse(presets));
+      if (projects) {
+        const parsedProjects: unknown = JSON.parse(projects);
+        if (!Array.isArray(parsedProjects)) throw new Error("Saved projects are not a list.");
+        setSavedProjects(parsedProjects.filter((item): item is { id: string; name: string; aspect: "16:9" | "9:16" | "1:1"; fps: 24 | 30 | 60; layers: { background: boolean; graphics: boolean; typography: boolean; footer: boolean }; spec: MotionSpec; updatedAt: number } =>
+          !!item && typeof item === "object" && typeof item.id === "string" && typeof item.name === "string" &&
+          (item.aspect === "16:9" || item.aspect === "9:16" || item.aspect === "1:1") &&
+          !!item.spec && typeof item.spec === "object" && typeof item.updatedAt === "number"
+        ).slice(0, 20));
+      }
+      if (presets) {
+        const parsedPresets: unknown = JSON.parse(presets);
+        if (!Array.isArray(parsedPresets)) throw new Error("Saved presets are not a list.");
+        setCustomPresets(parsedPresets.filter((item): item is { id: string; name: string; spec: MotionSpec } =>
+          !!item && typeof item === "object" && typeof item.id === "string" && typeof item.name === "string" &&
+          !!item.spec && typeof item.spec === "object"
+        ).slice(0, 30));
+      }
     } catch { setMessage({ type: "error", text: "Saved library could not be read. Exported project files remain unaffected." }); }
     finally { setLibraryLoaded(true); }
   }, []);
