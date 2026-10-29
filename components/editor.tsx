@@ -39,8 +39,9 @@ export function MotionEditor() {
   const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
   const currentProvider = PROVIDERS.find((item) => item.id === provider) ?? PROVIDERS[0];
-  const frameCount = spec.durationSeconds * 30;
+  const frameCount = spec.durationSeconds * fps;
   const [aspect, setAspect] = useState<"16:9" | "9:16" | "1:1">("16:9");
+  const [fps, setFps] = useState<24 | 30 | 60>(30);
   const [projectName, setProjectName] = useState("Untitled Motion");
   const [history, setHistory] = useState<MotionSpec[]>([]);
   const [future, setFuture] = useState<MotionSpec[]>([]);
@@ -183,7 +184,7 @@ export function MotionEditor() {
           id: "MotionComposition",
           component: MotionComposition,
           durationInFrames: frameCount,
-          fps: 30,
+          fps,
           width: dimensions.width,
           height: dimensions.height,
           defaultProps: inputProps,
@@ -235,7 +236,7 @@ export function MotionEditor() {
           </div>
           <p className="muted intro-copy">Describe the feeling. Let AI shape the first frame, then fine-tune the details.</p>
 
-          <div className="field-label-row"><label htmlFor="prompt">Your idea</label><span className="tiny-count">{prompt.length}/1200</span></div>
+          <div className="field-label-row"><label htmlFor="prompt">Your idea</label><button className="button button-small" onClick={() => setPrompt((value) => `${value.trim().replace(/[.\s]+$/, "")}. Create a polished motion graphic with a clear visual hierarchy, intentional negative space, strong typography, cohesive colors, and a readable opening-to-ending sequence. Avoid clutter and keep the main message legible at mobile size.`.slice(0, 1200))}>Improve brief</button><span className="tiny-count">{prompt.length}/1200</span></div>
           <textarea id="prompt" value={prompt} maxLength={1200} onChange={(event) => setPrompt(event.target.value)} className="prompt-input" placeholder="A bold launch animation for…"/>
           <div className="starter-row">
             {STARTER_PROMPTS.slice(0, 3).map((item) => (
@@ -287,6 +288,7 @@ export function MotionEditor() {
             ))}
           </div>
 
+          <label className="control-label" htmlFor="output-fps">Frame rate</label><select id="output-fps" className="control-input" value={fps} onChange={(event) => setFps(Number(event.target.value) as 24 | 30 | 60)}><option value={24}>24 FPS · Cinematic</option><option value={30}>30 FPS · Social</option><option value={60}>60 FPS · Smooth</option></select>
           <div className="section-divider" />
           <div className="section-title"><span className="eyebrow">CUSTOM PRESETS</span><button className="button button-small" onClick={saveCustomPreset}><BookmarkPlus size={12}/> Save current</button></div>
           {customPresets.length > 0 ? <div className="custom-preset-list">{customPresets.map((item) => <div className="custom-preset-row" key={item.id}><button className="custom-preset-load" onClick={() => { setHistory((items) => [...items.slice(-39), spec]); setFuture([]); setSpec(normalizeSpec(item.spec)); setMessage({ type: "success", text: `Preset “${item.name}” applied.` }); }}><span>{item.name}</span><small>{PRESET_META[item.spec.preset].name}</small></button><button className="icon-button" aria-label={`Delete ${item.name}`} onClick={() => setCustomPresets((items) => items.filter((preset) => preset.id !== item.id))}><Trash2 size={13}/></button></div>)}</div> : <p className="muted small">Save a style you like to reuse it later.</p>}
@@ -310,7 +312,7 @@ export function MotionEditor() {
                 durationInFrames={frameCount}
                 compositionWidth={dimensions.width}
                 compositionHeight={dimensions.height}
-                fps={30}
+                fps={fps}
                 controls
                 clickToPlay
                 doubleClickToFullscreen
@@ -326,7 +328,7 @@ export function MotionEditor() {
             <div className="track-row"><div className="track-label">MOTION</div><div className="track-lane"><div className="track-clip" style={{ width: "100%" }}><span>Intro / {PRESET_META[spec.preset].name}</span><span className="track-clip-end">{spec.durationSeconds}s</span></div></div></div>
             <div className="track-row"><div className="track-label">TYPE</div><div className="track-lane"><div className="track-clip track-clip-type" style={{ width: "76%" }}><span>{spec.title || "Untitled"}</span></div></div></div>
             <div className="track-row"><div className="track-label">KEYFRAME</div><div className="track-lane"><div className="track-clip track-clip-type" style={{ width: Math.min(100, spec.titleStartFrame / Math.max(1, frameCount) * 100) + "%", minWidth: 5 }}><span>Title start · frame {spec.titleStartFrame}</span></div></div></div>
-          <div className="timeline-bottom"><span><Clock3 size={12}/> 30 frames / second</span><span>Composition updates live <span className="live-dot" /></span></div>
+          <div className="timeline-bottom"><span><Clock3 size={12}/> {fps} frames / second</span><span>Composition updates live <span className="live-dot" /></span></div>
           </div>
         </section>
 
