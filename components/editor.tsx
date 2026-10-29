@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Player } from "@remotion/player";
 import {
   ArrowDownToLine, Check, ChevronDown, CircleHelp, Clapperboard, Clock3,
-  Download, KeyRound, LoaderCircle, Monitor, Play, Plus, RefreshCw,
+  Download, KeyRound, LoaderCircle, Monitor, RefreshCw,
   Settings2, Sparkles, WandSparkles, X,
 } from "lucide-react";
 import { DEFAULT_SPEC, MOTION_PRESETS, PRESET_META, normalizeSpec } from "@/lib/motion-types";
@@ -116,11 +117,11 @@ export function MotionEditor() {
   return (
     <main className="studio-shell">
       <header className="topbar">
-        <a className="brand" href="/" aria-label="Motion Studio home">
+        <Link className="brand" href="/" aria-label="Motion Studio home">
           <span className="brand-mark"><Clapperboard size={17} strokeWidth={2.2} /></span>
           <span>motion<span className="brand-slash">/</span>studio</span>
           <span className="beta-pill">BETA</span>
-        </a>
+        </Link>
         <div className="topbar-center"><span className="live-dot" /> LOCAL PROJECT <span className="topbar-divider">/</span> UNTITLED MOTION 01</div>
         <div className="topbar-actions">
           <button className="button button-quiet button-settings" onClick={() => setSettingsOpen((open) => !open)}><KeyRound size={15} /> <span>AI settings</span> <ChevronDown size={13} /></button>
@@ -142,7 +143,7 @@ export function MotionEditor() {
           <div className="field-label-row"><label htmlFor="prompt">Your idea</label><span className="tiny-count">{prompt.length}/1200</span></div>
           <textarea id="prompt" value={prompt} maxLength={1200} onChange={(event) => setPrompt(event.target.value)} className="prompt-input" placeholder="A bold launch animation for…"/>
           <div className="starter-row">
-            {STARTER_PROMPTS.slice(0, 3).map((item, index) => (
+            {STARTER_PROMPTS.slice(0, 3).map((item) => (
               <button key={item.label} className="starter-chip" onClick={() => setPrompt(item.prompt)}>{item.label}</button>
             ))}
           </div>
