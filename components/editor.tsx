@@ -88,6 +88,8 @@ export function MotionEditor() {
       });
       const data = (await response.json()) as { spec?: Partial<MotionSpec>; error?: string };
       if (!response.ok || !data.spec) throw new Error(data.error ?? "Generate failed.");
+      setHistory((items) => [...items.slice(-39), spec]);
+      setFuture([]);
       setSpec(normalizeSpec(data.spec));
       setMessage({ type: "success", text: "Motion direction generated. Preview updated." });
       setSettingsOpen(false);
@@ -222,7 +224,7 @@ export function MotionEditor() {
         </aside>
 
         <section className="preview-panel" aria-label="Motion preview">
-          <div className="preview-heading"><div><span className="eyebrow">LIVE COMPOSITION</span><div className="preview-title">Untitled motion <span className="edit-dot" /></div></div><div className="preview-heading-actions"><span className="preview-size"><Monitor size={13}/> 1920 × 1080</span><button className="icon-button" title="Reset text" aria-label="Reset motion text" onClick={() => setSpec(DEFAULT_SPEC)}><RefreshCw size={15}/></button></div></div>
+          <div className="preview-heading"><div><span className="eyebrow">LIVE COMPOSITION</span><div className="preview-title">{projectName || "Untitled motion"} <span className="edit-dot" /></div></div><div className="preview-heading-actions"><span className="preview-size"><Monitor size={13}/> {dimensions.width} × {dimensions.height}</span><button className="icon-button" title="Reset text" aria-label="Reset motion text" onClick={() => { setHistory((items) => [...items.slice(-39), spec]); setFuture([]); setSpec(DEFAULT_SPEC); }}><RefreshCw size={15}/></button></div></div>
           <div className="preview-stage">
             <div className="preview-frame">
               <Player
