@@ -80,6 +80,17 @@ export function MotionEditor() {
       if (!data.spec || typeof data.spec !== "object" || Array.isArray(data.spec)) {
         throw new Error("Project is missing a valid motion spec.");
       }
+      const rawSpec = data.spec as Record<string, unknown>;
+      const requiredTextFields = ["eyebrow", "title", "subtitle", "background", "accent", "secondary", "preset"];
+      if (requiredTextFields.some((key) => typeof rawSpec[key] !== "string") ||
+          typeof rawSpec.durationSeconds !== "number" ||
+          !Number.isFinite(rawSpec.durationSeconds) ||
+          typeof rawSpec.titleStartFrame !== "number" ||
+          !Number.isFinite(rawSpec.titleStartFrame) ||
+          typeof rawSpec.titleTravel !== "number" ||
+          !Number.isFinite(rawSpec.titleTravel)) {
+        throw new Error("Project motion spec is incomplete or has invalid field types.");
+      }
       if (data.aspect !== "16:9" && data.aspect !== "9:16" && data.aspect !== "1:1") {
         throw new Error("Project has an unsupported canvas ratio.");
       }
