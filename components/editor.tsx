@@ -48,6 +48,7 @@ export function MotionEditor() {
   const [savedProjects, setSavedProjects] = useState<{ id: string; name: string; aspect: "16:9" | "9:16" | "1:1"; spec: MotionSpec; updatedAt: number }[]>([]);
   const [customPresets, setCustomPresets] = useState<{ id: string; name: string; spec: MotionSpec }[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
+  const [libraryLoaded, setLibraryLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dimensions = aspect === "9:16" ? { width: 1080, height: 1920 } : aspect === "1:1" ? { width: 1080, height: 1080 } : { width: 1920, height: 1080 };
   const inputProps = useMemo(() => ({ spec, layers }), [spec, layers]);
@@ -59,9 +60,10 @@ export function MotionEditor() {
       if (projects) setSavedProjects(JSON.parse(projects));
       if (presets) setCustomPresets(JSON.parse(presets));
     } catch { setMessage({ type: "error", text: "Saved library could not be read. Exported project files remain unaffected." }); }
+    finally { setLibraryLoaded(true); }
   }, []);
-  useEffect(() => { try { localStorage.setItem("motion-studio-projects-v1", JSON.stringify(savedProjects.slice(0, 20))); } catch { setMessage({ type: "error", text: "Local project library is full. Export a project file to keep a backup." }); } }, [savedProjects]);
-  useEffect(() => { try { localStorage.setItem("motion-studio-presets-v1", JSON.stringify(customPresets.slice(0, 30))); } catch { setMessage({ type: "error", text: "Custom preset storage is full." }); } }, [customPresets]);
+  useEffect(() => { if (!libraryLoaded) return; try { localStorage.setItem("motion-studio-projects-v1", JSON.stringify(savedProjects.slice(0, 20))); } catch { setMessage({ type: "error", text: "Local project library is full. Export a project file to keep a backup." }); } }, [savedProjects, libraryLoaded]);
+  useEffect(() => { if (!libraryLoaded) return; try { localStorage.setItem("motion-studio-presets-v1", JSON.stringify(customPresets.slice(0, 30))); } catch { setMessage({ type: "error", text: "Custom preset storage is full." }); } }, [customPresets, libraryLoaded]);
 
   function changeProvider(next: Provider) {
     setProvider(next);
