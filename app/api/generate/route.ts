@@ -10,8 +10,9 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const requestSchema = z.object({
-  provider: z.enum(["openai", "anthropic", "google"]),
-  apiKey: z.string().min(12).max(512),
+  provider: z.enum(["openai", "anthropic", "google", "custom"]),
+  apiKey: z.string().min(1).max(512),
+  baseURL: z.string().trim().max(500).optional(),
   model: z.string().trim().min(2).max(100),
   prompt: z.string().trim().min(3).max(1200),
 });
@@ -37,12 +38,38 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (body.provider === "custom") {
+      if (!body.baseURL) {
+        return NextResponse.json({ error: "Enter your OpenAI-compatible base URL." }, { status: 400 });
+      }
+      let endpoint: URL;
+      try {
+        endpoint = new URL(body.baseURL);
+      } catch {
+        return NextResponse.json({ error: "The custom endpoint URL is invalid." }, { status: 400 });
+      }
+      const hostname = endpoint.hostname.toLowerCase();
+      const isLocal = hostname === "localhost" || hostname.endsWith(".localhost") ||
+        hostname === "::1" || hostname === "127.0.0.1" || hostname.startsWith("127.") ||
+        hostname === "0.0.0.0" || hostname.startsWith("10.") || hostname.startsWith("192.168.") ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) || hostname.endsWith(".local") ||
+        hostname === "169.254.169.254";
+      if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password ||
+          endpoint.search || endpoint.hash || isLocal) {
+        return NextResponse.json({
+          error: "Use a public HTTPS base URL without credentials, query parameters, or a local/private host."
+        }, { status: 400 });
+      }
+    }
+
     const model =
       body.provider === "openai"
         ? createOpenAI({ apiKey: body.apiKey })(body.model)
-        : body.provider === "anthropic"
-          ? createAnthropic({ apiKey: body.apiKey })(body.model)
-          : createGoogleGenerativeAI({ apiKey: body.apiKey })(body.model);
+        : body.provider === "custom"
+          ? createOpenAI({ apiKey: body.apiKey, baseURL: body.baseURL, compatibility: "compatible" })(body.model)
+          : body.provider === "anthropic"
+            ? createAnthropic({ apiKey: body.apiKey })(body.model)
+            : createGoogleGenerativeAI({ apiKey: body.apiKey })(body.model);
 
     const result = await generateText({
       model,
