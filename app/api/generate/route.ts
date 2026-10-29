@@ -53,7 +53,7 @@ function isPublicIP(address: string): boolean {
   if (version === 4) return isPublicIPv4(address);
   if (version !== 6) return false;
   const value = address.toLowerCase().split("%")[0];
-  if (value === "::" || value === "::1" || value.startsWith("fc") || value.startsWith("fd") ||
+  if (value === "::" || value === "::1" || value.startsWith("::ffff:") || value.startsWith("fc") || value.startsWith("fd") ||
       /^fe[89ab]/.test(value) || value.startsWith("ff")) return false;
   const mapped = value.match(/^(?:::ffff:)(\d+\.\d+\.\d+\.\d+)$/);
   if (mapped) return isPublicIPv4(mapped[1]);
