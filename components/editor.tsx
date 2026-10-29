@@ -109,8 +109,8 @@ export function MotionEditor() {
           component: MotionComposition,
           durationInFrames: frameCount,
           fps: 30,
-          width: 1920,
-          height: 1080,
+          width: dimensions.width,
+          height: dimensions.height,
           defaultProps: inputProps,
         },
         inputProps,
@@ -119,7 +119,7 @@ export function MotionEditor() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = "motion-studio.mp4";
+      link.download = (projectName.trim() || "motion-studio").replace(/[^a-z0-9-_]+/gi, "-").toLowerCase() + "-" + aspect.replace(":", "x") + ".mp4";
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -192,7 +192,14 @@ export function MotionEditor() {
           )}
 
           <div className="section-divider" />
-          <div className="section-title"><span className="eyebrow">02 / STYLE SYSTEM</span><span className="muted small">Choose a direction</span></div>
+          <div className="section-title"><span className="eyebrow">02 / STARTER TEMPLATES</span><span className="muted small">One-tap start</span></div>
+          <div className="template-grid">
+            <button className="template-card" onClick={() => applyTemplate("launch")}><span className="template-preview template-launch">Aa</span><strong>Product launch</strong><span>Bold / Neon</span></button>
+            <button className="template-card" onClick={() => applyTemplate("social")}><span className="template-preview template-social">GO!</span><strong>Social intro</strong><span>Expressive / Kinetic</span></button>
+            <button className="template-card" onClick={() => applyTemplate("minimal")}><span className="template-preview template-minimal">Less.</span><strong>Minimal editorial</strong><span>Quiet / Clean</span></button>
+          </div>
+          <div className="section-divider" />
+          <div className="section-title"><span className="eyebrow">03 / STYLE SYSTEM</span><span className="muted small">Choose a direction</span></div>
           <div className="preset-grid">
             {MOTION_PRESETS.map((preset) => (
               <button key={preset} className={`preset-card ${spec.preset === preset ? "selected" : ""}`} onClick={() => update("preset", preset as MotionPreset)} aria-pressed={spec.preset === preset}>
@@ -205,8 +212,11 @@ export function MotionEditor() {
           </div>
 
           <div className="section-divider" />
-          <div className="section-title"><span className="eyebrow">03 / CANVAS</span><span className="muted small">16:9 · Full HD</span></div>
-          <div className="canvas-chip"><Monitor size={15} /><span>1920 × 1080</span><span className="canvas-fps">30 FPS</span></div>
+          <div className="section-title"><span className="eyebrow">04 / CANVAS</span><span className="muted small">Aspect ratio</span></div>
+          <div className="aspect-grid" role="group" aria-label="Canvas aspect ratio">
+            {(["16:9", "9:16", "1:1"] as const).map((ratio) => <button key={ratio} className={"aspect-button " + (aspect === ratio ? "active" : "")} onClick={() => setAspect(ratio)} aria-pressed={aspect === ratio}><span className={"aspect-icon aspect-" + ratio.replace(":", "-")} />{ratio}</button>)}
+          </div>
+          <div className="canvas-chip"><Monitor size={15} /><span>{dimensions.width} × {dimensions.height}</span><span className="canvas-fps">30 FPS</span></div>
           <label className="range-label" htmlFor="duration"><span>Duration</span><strong>{spec.durationSeconds}s</strong></label>
           <input id="duration" type="range" min="4" max="15" value={spec.durationSeconds} onChange={(event) => update("durationSeconds", Number(event.target.value))} className="range-input"/>
         </aside>
@@ -219,13 +229,13 @@ export function MotionEditor() {
                 component={MotionComposition}
                 inputProps={inputProps}
                 durationInFrames={frameCount}
-                compositionWidth={1920}
-                compositionHeight={1080}
+                compositionWidth={dimensions.width}
+                compositionHeight={dimensions.height}
                 fps={30}
                 controls
                 clickToPlay
                 doubleClickToFullscreen
-                style={{ width: "100%", aspectRatio: "16 / 9" }}
+                style={{ width: "100%", aspectRatio: dimensions.width + " / " + dimensions.height, maxHeight: aspect === "9:16" ? "68vh" : undefined }}
                 className="motion-player"
               />
             </div>
@@ -243,6 +253,11 @@ export function MotionEditor() {
         <aside className="right-panel">
           <div className="right-panel-heading"><div><span className="eyebrow">04 / PROPERTIES</span><h2>Fine-tune</h2></div><span className="icon-square"><Settings2 size={16}/></span></div>
           <p className="muted small">Edits are reflected in the preview instantly.</p>
+          <div className="property-section">
+            <span className="property-heading">Project</span>
+            <label className="control-label" htmlFor="project-name">Project name</label>
+            <input id="project-name" className="control-input" value={projectName} maxLength={80} onChange={(event) => setProjectName(event.target.value)} />
+          </div>
           <div className="property-section">
             <span className="property-heading">Typography</span>
             <label className="control-label" htmlFor="eyebrow">Eyebrow</label>
