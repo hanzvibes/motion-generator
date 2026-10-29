@@ -12,11 +12,12 @@ import { DEFAULT_SPEC, MOTION_PRESETS, PRESET_META, normalizeSpec } from "@/lib/
 import type { MotionPreset, MotionSpec } from "@/lib/motion-types";
 import { MotionComposition } from "@/components/motion-composition";
 
-type Provider = "openai" | "anthropic" | "google";
+type Provider = "openai" | "anthropic" | "google" | "custom";
 const PROVIDERS: { id: Provider; label: string; defaultModel: string; hint: string }[] = [
-  { id: "openai", label: "OpenAI", defaultModel: "gpt-4.1-mini", hint: "API key from platform.openai.com" },
+  { id: "openai", label: "OpenAI API", defaultModel: "gpt-4.1-mini", hint: "API key from platform.openai.com" },
   { id: "anthropic", label: "Anthropic", defaultModel: "claude-sonnet-4-5", hint: "API key from console.anthropic.com" },
-  { id: "google", label: "Google Gemini", defaultModel: "gemini-2.5-flash", hint: "API key from aistudio.google.com" },
+  { id: "google", label: "Google Gemini API", defaultModel: "gemini-2.5-flash", hint: "API key from aistudio.google.com. Recommended for Gemini models used with Antigravity." },
+  { id: "custom", label: "Custom OpenAI-compatible", defaultModel: "your-model-id", hint: "Works with compatible hosted gateways and APIs. Use a public HTTPS endpoint." },
 ];
 
 const STARTER_PROMPTS = [
@@ -31,6 +32,7 @@ export function MotionEditor() {
   const [prompt, setPrompt] = useState(STARTER_PROMPTS[1].prompt);
   const [provider, setProvider] = useState<Provider>("openai");
   const [apiKey, setApiKey] = useState("");
+  const [baseURL, setBaseURL] = useState("");
   const [model, setModel] = useState(PROVIDERS[0].defaultModel);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -50,9 +52,14 @@ export function MotionEditor() {
   }
 
   async function generate() {
-    if (!apiKey.trim()) {
+    if (provider !== "custom" && !apiKey.trim()) {
       setSettingsOpen(true);
       setMessage({ type: "error", text: "Masukkan API key milikmu dulu di AI settings." });
+      return;
+    }
+    if (provider === "custom" && !baseURL.trim()) {
+      setSettingsOpen(true);
+      setMessage({ type: "error", text: "Masukkan base URL endpoint OpenAI-compatible." });
       return;
     }
     if (!prompt.trim()) {
@@ -66,7 +73,7 @@ export function MotionEditor() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({ provider, apiKey: apiKey.trim(), model: model.trim(), prompt: prompt.trim() }),
+        body: JSON.stringify({ provider, apiKey: apiKey.trim(), baseURL: baseURL.trim(), model: model.trim(), prompt: prompt.trim() }),
       });
       const data = (await response.json()) as { spec?: Partial<MotionSpec>; error?: string };
       if (!response.ok || !data.spec) throw new Error(data.error ?? "Generate failed.");
@@ -161,11 +168,13 @@ export function MotionEditor() {
               <select id="provider" value={provider} onChange={(event) => changeProvider(event.target.value as Provider)} className="control-input">
                 {PROVIDERS.map((item) => <option value={item.id} key={item.id}>{item.label}</option>)}
               </select>
+              {provider === "custom" && <><label className="control-label" htmlFor="base-url">Base URL</label><input id="base-url" type="url" value={baseURL} onChange={(event) => setBaseURL(event.target.value)} className="control-input" placeholder="https://api.example.com/v1" autoComplete="url" spellCheck={false}/></>}
               <label className="control-label" htmlFor="model">Model ID</label>
               <input id="model" value={model} onChange={(event) => setModel(event.target.value)} className="control-input" placeholder="Enter your provider model ID" autoComplete="off"/>
-              <label className="control-label" htmlFor="api-key">API key</label>
-              <input id="api-key" type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} className="control-input" placeholder="Paste your API key" autoComplete="off" spellCheck={false}/>
+              <label className="control-label" htmlFor="api-key">API key {provider === "custom" ? "(optional if endpoint needs no auth)" : ""}</label>
+              <input id="api-key" type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} className="control-input" placeholder={provider === "custom" ? "API key / bearer token (if required)" : "Paste your API key"} autoComplete="off" spellCheck={false}/>
               <p className="settings-hint">{currentProvider.hint}. The key is only sent with a generation request and is not saved by this app.</p>
+              <p className="settings-hint">Antigravity users: choose Google Gemini API with an AI Studio key. ChatGPT/Codex account sign-in is not available in this build; use an OpenAI API key for now.</p>
               <div className="settings-foot"><span><span className="status-dot" /> Request-only</span><button className="button button-small" onClick={() => { setApiKey(""); setMessage({ type: "info", text: "API key cleared from this page." }); }}>Clear key</button></div>
             </section>
           )}
