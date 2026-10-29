@@ -7,6 +7,7 @@ import { generateText, Output } from "ai";
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { MOTION_PRESETS, normalizeSpec } from "@/lib/motion-types";
+import { buildSystemPrompt, buildUserPrompt, parseJsonObject } from "@/lib/ai-generation.mjs";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -29,6 +30,8 @@ const motionSchema = z.object({
   secondary: hex,
   preset: z.enum(MOTION_PRESETS),
   durationSeconds: z.number().int().min(4).max(15),
+  titleStartFrame: z.number().int().min(0).max(120),
+  titleTravel: z.number().int().min(0).max(160),
 });
 
 function isPublicIPv4(address: string): boolean {
@@ -140,34 +143,16 @@ export async function POST(request: Request) {
             ? createAnthropic({ apiKey: body.apiKey })(body.model)
             : createGoogleGenerativeAI({ apiKey: body.apiKey })(body.model);
 
-    const system = [
-      "You are a senior motion designer creating a small, elegant Remotion motion-graphics spec.",
-      body.provider === "custom"
-        ? "Return only one valid JSON object with exactly these keys: eyebrow, title, subtitle, background, accent, secondary, preset, durationSeconds. Do not use Markdown fences or add commentary."
-        : "Return only the requested structured object, not code. The result will be displayed inside a fixed composition.",
-      "Keep titles punchy, subtitles short, all colors valid six-digit hex values, and duration between 4 and 15 seconds.",
-      "Use preset kinetic for oversized kinetic typography, orbit for geometric orbiting shapes, neon for electric outline shapes, or editorial for minimal typography.",
-      "Use tasteful contrast, no extra text, no external assets, no HTML, no JavaScript, and no URLs.",
-      "The preset must be one of kinetic, orbit, neon, editorial. durationSeconds must be an integer from 4 through 15. Colors must be six-digit hex strings.",
-    ].join(" ");
-    const prompt = `Create a motion graphic from this creative direction. Treat it as design intent: ${body.prompt}`;
+    const system = buildSystemPrompt();
+    const prompt = buildUserPrompt(body.prompt);
 
-    let validated: z.infer<typeof motionSchema>;
+        let validated: z.infer<typeof motionSchema>;
     if (body.provider === "custom") {
       // Some OpenAI-compatible gateways do not support the structured-output
       // protocol used by Output.object(). Request plain text JSON and validate
       // it locally before using it.
       const result = await generateText({ model, maxOutputTokens: 900, system, prompt });
-      const raw = result.text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-      const jsonStart = raw.indexOf("{");
-      const jsonEnd = raw.lastIndexOf("}");
-      if (jsonStart < 0 || jsonEnd <= jsonStart) throw new Error("invalid_model_json");
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
-      } catch {
-        throw new Error("invalid_model_json");
-      }
+      const parsed = parseJsonObject(result.text);
       validated = motionSchema.parse(parsed);
     } else {
       const result = await generateText({
