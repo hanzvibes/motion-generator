@@ -93,7 +93,7 @@ export function MotionEditor() {
           fps: 30,
           width: 1920,
           height: 1080,
-          calculateMetadata: null,
+          defaultProps: inputProps,
         },
         inputProps,
       });
