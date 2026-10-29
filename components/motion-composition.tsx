@@ -9,9 +9,10 @@ export type MotionCompositionProps = { spec: MotionSpec };
 export function MotionComposition({ spec }: MotionCompositionProps) {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
-  const intro = spring({ frame, fps, config: { damping: 18, stiffness: 100, mass: 0.8 } });
-  const fade = interpolate(frame, [0, 18, 42], [0, 1, 1], { extrapolateRight: "clamp" });
-  const lift = interpolate(intro, [0, 1], [54, 0]);
+  const animationFrame = Math.max(0, frame - spec.titleStartFrame);
+  const intro = spring({ frame: animationFrame, fps, config: { damping: 18, stiffness: 100, mass: 0.8 } });
+  const fade = interpolate(frame, [spec.titleStartFrame, spec.titleStartFrame + 18, spec.titleStartFrame + 42], [0, 1, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const lift = interpolate(intro, [0, 1], [spec.titleTravel, 0]);
   const spin = interpolate(frame, [0, 240], [-14, 22]);
   const pulse = 0.92 + Math.sin(frame / 13) * 0.05;
   const large = width * 0.105;

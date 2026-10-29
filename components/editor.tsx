@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Player } from "@remotion/player";
 import {
-  ArrowDownToLine, Check, ChevronDown, CircleHelp, Clapperboard, Clock3,
+  ArrowDownToLine, Check, ChevronDown, CircleHelp, Clapperboard, Clock3, FileDown, FileUp, Undo2, Redo2,
   Download, KeyRound, LoaderCircle, Monitor, RefreshCw,
   Settings2, Sparkles, WandSparkles, X,
 } from "lucide-react";
@@ -40,6 +40,12 @@ export function MotionEditor() {
   const [message, setMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
   const currentProvider = PROVIDERS.find((item) => item.id === provider) ?? PROVIDERS[0];
   const frameCount = spec.durationSeconds * 30;
+  const [aspect, setAspect] = useState<"16:9" | "9:16" | "1:1">("16:9");
+  const [projectName, setProjectName] = useState("Untitled Motion");
+  const [history, setHistory] = useState<MotionSpec[]>([]);
+  const [future, setFuture] = useState<MotionSpec[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dimensions = aspect === "9:16" ? { width: 1080, height: 1920 } : aspect === "1:1" ? { width: 1080, height: 1080 } : { width: 1920, height: 1080 };
   const inputProps = useMemo(() => ({ spec }), [spec]);
 
   function changeProvider(next: Provider) {
@@ -48,8 +54,13 @@ export function MotionEditor() {
   }
 
   function update<K extends keyof MotionSpec>(key: K, value: MotionSpec[K]) {
-    setSpec((current) => normalizeSpec({ ...current, [key]: value }));
+    setSpec((current) => { const next = normalizeSpec({ ...current, [key]: value }); if (JSON.stringify(current) !== JSON.stringify(next)) { setHistory((items) => [...items.slice(-39), current]); setFuture([]); } return next; });
   }
+  function undo() { if (!history.length) return; setFuture((items) => [spec, ...items].slice(0, 40)); setSpec(history[history.length - 1]); setHistory((items) => items.slice(0, -1)); }
+  function redo() { if (!future.length) return; setHistory((items) => [...items.slice(-39), spec]); setSpec(future[0]); setFuture((items) => items.slice(1)); }
+  function saveProject() { const blob = new Blob([JSON.stringify({ version: 1, name: projectName, aspect, spec }, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = (projectName.trim() || "motion-project").replace(/[^a-z0-9-_]+/gi, "-").toLowerCase() + ".json"; link.click(); URL.revokeObjectURL(url); setMessage({ type: "success", text: "Project file exported." }); }
+  async function loadProject(file?: File) { if (!file) return; try { if (file.size > 1000000) throw new Error("Project file is too large."); const data = JSON.parse(await file.text()) as { name?: unknown; aspect?: unknown; spec?: unknown }; if (!data.spec || typeof data.spec !== "object") throw new Error("Invalid project file."); setHistory((items) => [...items.slice(-39), spec]); setFuture([]); setSpec(normalizeSpec(data.spec as Partial<MotionSpec>)); if (typeof data.name === "string") setProjectName(data.name.slice(0, 80)); if (data.aspect === "16:9" || data.aspect === "9:16" || data.aspect === "1:1") setAspect(data.aspect); setMessage({ type: "success", text: "Project loaded." }); } catch (error) { setMessage({ type: "error", text: error instanceof Error ? error.message : "Could not load project file." }); } }
+  function applyTemplate(template: "launch" | "social" | "minimal") { const templates = { launch: { ...DEFAULT_SPEC, eyebrow: "NEW RELEASE / 2026", title: "Made to stand out.", subtitle: "A new perspective starts here.", preset: "neon" as MotionPreset, accent: "#c6ff55", secondary: "#8b7cff" }, social: { ...DEFAULT_SPEC, eyebrow: "CREATOR SERIES / 001", title: "Make some noise.", subtitle: "Ideas worth stopping for.", preset: "kinetic" as MotionPreset, accent: "#ff765d", secondary: "#ffd166" }, minimal: { ...DEFAULT_SPEC, eyebrow: "STUDIO NOTES / 001", title: "Less, but better.", subtitle: "Clarity in every frame.", preset: "editorial" as MotionPreset, background: "#e9e7dd", accent: "#272822", secondary: "#9eaa87" } }; setHistory((items) => [...items.slice(-39), spec]); setFuture([]); setSpec(normalizeSpec(templates[template])); setMessage({ type: "success", text: "Template applied." }); }
 
   async function generate() {
     if (provider !== "custom" && !apiKey.trim()) {
@@ -77,6 +88,8 @@ export function MotionEditor() {
       });
       const data = (await response.json()) as { spec?: Partial<MotionSpec>; error?: string };
       if (!response.ok || !data.spec) throw new Error(data.error ?? "Generate failed.");
+      setHistory((items) => [...items.slice(-39), spec]);
+      setFuture([]);
       setSpec(normalizeSpec(data.spec));
       setMessage({ type: "success", text: "Motion direction generated. Preview updated." });
       setSettingsOpen(false);
@@ -98,8 +111,8 @@ export function MotionEditor() {
           component: MotionComposition,
           durationInFrames: frameCount,
           fps: 30,
-          width: 1920,
-          height: 1080,
+          width: dimensions.width,
+          height: dimensions.height,
           defaultProps: inputProps,
         },
         inputProps,
@@ -108,7 +121,7 @@ export function MotionEditor() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = "motion-studio.mp4";
+      link.download = (projectName.trim() || "motion-studio").replace(/[^a-z0-9-_]+/gi, "-").toLowerCase() + "-" + aspect.replace(":", "x") + ".mp4";
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -129,7 +142,8 @@ export function MotionEditor() {
           <span>motion<span className="brand-slash">/</span>studio</span>
           <span className="beta-pill">BETA</span>
         </Link>
-        <div className="topbar-center"><span className="live-dot" /> LOCAL PROJECT <span className="topbar-divider">/</span> UNTITLED MOTION 01</div>
+        <div className="topbar-center"><span className="live-dot" /> LOCAL PROJECT <span className="topbar-divider">/</span> {projectName.toUpperCase()}</div>
+        <div className="topbar-actions"><button className="button button-quiet" onClick={undo} disabled={!history.length} title="Undo"><Undo2 size={15}/></button><button className="button button-quiet" onClick={redo} disabled={!future.length} title="Redo"><Redo2 size={15}/></button><button className="button button-quiet" onClick={saveProject} title="Save project"><FileDown size={15}/><span>Save</span></button><button className="button button-quiet" onClick={() => fileInputRef.current?.click()} title="Open project"><FileUp size={15}/><span>Open</span></button><input ref={fileInputRef} type="file" accept="application/json,.json" hidden onChange={(event) => { void loadProject(event.target.files?.[0]); event.currentTarget.value = ""; }}/></div>
         <div className="topbar-actions">
           <button className="button button-quiet button-settings" onClick={() => setSettingsOpen((open) => !open)}><KeyRound size={15} /> <span>AI settings</span> <ChevronDown size={13} /></button>
           <button className="button button-primary export-button" onClick={exportVideo} disabled={exporting}>
@@ -180,7 +194,14 @@ export function MotionEditor() {
           )}
 
           <div className="section-divider" />
-          <div className="section-title"><span className="eyebrow">02 / STYLE SYSTEM</span><span className="muted small">Choose a direction</span></div>
+          <div className="section-title"><span className="eyebrow">02 / STARTER TEMPLATES</span><span className="muted small">One-tap start</span></div>
+          <div className="template-grid">
+            <button className="template-card" onClick={() => applyTemplate("launch")}><span className="template-preview template-launch">Aa</span><strong>Product launch</strong><span>Bold / Neon</span></button>
+            <button className="template-card" onClick={() => applyTemplate("social")}><span className="template-preview template-social">GO!</span><strong>Social intro</strong><span>Expressive / Kinetic</span></button>
+            <button className="template-card" onClick={() => applyTemplate("minimal")}><span className="template-preview template-minimal">Less.</span><strong>Minimal editorial</strong><span>Quiet / Clean</span></button>
+          </div>
+          <div className="section-divider" />
+          <div className="section-title"><span className="eyebrow">03 / STYLE SYSTEM</span><span className="muted small">Choose a direction</span></div>
           <div className="preset-grid">
             {MOTION_PRESETS.map((preset) => (
               <button key={preset} className={`preset-card ${spec.preset === preset ? "selected" : ""}`} onClick={() => update("preset", preset as MotionPreset)} aria-pressed={spec.preset === preset}>
@@ -193,27 +214,30 @@ export function MotionEditor() {
           </div>
 
           <div className="section-divider" />
-          <div className="section-title"><span className="eyebrow">03 / CANVAS</span><span className="muted small">16:9 · Full HD</span></div>
-          <div className="canvas-chip"><Monitor size={15} /><span>1920 × 1080</span><span className="canvas-fps">30 FPS</span></div>
+          <div className="section-title"><span className="eyebrow">04 / CANVAS</span><span className="muted small">Aspect ratio</span></div>
+          <div className="aspect-grid" role="group" aria-label="Canvas aspect ratio">
+            {(["16:9", "9:16", "1:1"] as const).map((ratio) => <button key={ratio} className={"aspect-button " + (aspect === ratio ? "active" : "")} onClick={() => setAspect(ratio)} aria-pressed={aspect === ratio}><span className={"aspect-icon aspect-" + ratio.replace(":", "-")} />{ratio}</button>)}
+          </div>
+          <div className="canvas-chip"><Monitor size={15} /><span>{dimensions.width} × {dimensions.height}</span><span className="canvas-fps">30 FPS</span></div>
           <label className="range-label" htmlFor="duration"><span>Duration</span><strong>{spec.durationSeconds}s</strong></label>
           <input id="duration" type="range" min="4" max="15" value={spec.durationSeconds} onChange={(event) => update("durationSeconds", Number(event.target.value))} className="range-input"/>
         </aside>
 
         <section className="preview-panel" aria-label="Motion preview">
-          <div className="preview-heading"><div><span className="eyebrow">LIVE COMPOSITION</span><div className="preview-title">Untitled motion <span className="edit-dot" /></div></div><div className="preview-heading-actions"><span className="preview-size"><Monitor size={13}/> 1920 × 1080</span><button className="icon-button" title="Reset text" aria-label="Reset motion text" onClick={() => setSpec(DEFAULT_SPEC)}><RefreshCw size={15}/></button></div></div>
+          <div className="preview-heading"><div><span className="eyebrow">LIVE COMPOSITION</span><div className="preview-title">{projectName || "Untitled motion"} <span className="edit-dot" /></div></div><div className="preview-heading-actions"><span className="preview-size"><Monitor size={13}/> {dimensions.width} × {dimensions.height}</span><button className="icon-button" title="Reset text" aria-label="Reset motion text" onClick={() => { setHistory((items) => [...items.slice(-39), spec]); setFuture([]); setSpec(DEFAULT_SPEC); }}><RefreshCw size={15}/></button></div></div>
           <div className="preview-stage">
             <div className="preview-frame">
               <Player
                 component={MotionComposition}
                 inputProps={inputProps}
                 durationInFrames={frameCount}
-                compositionWidth={1920}
-                compositionHeight={1080}
+                compositionWidth={dimensions.width}
+                compositionHeight={dimensions.height}
                 fps={30}
                 controls
                 clickToPlay
                 doubleClickToFullscreen
-                style={{ width: "100%", aspectRatio: "16 / 9" }}
+                style={{ width: "100%", aspectRatio: dimensions.width + " / " + dimensions.height, maxHeight: aspect === "9:16" ? "68vh" : undefined }}
                 className="motion-player"
               />
             </div>
@@ -224,13 +248,19 @@ export function MotionEditor() {
             <div className="timeline-ruler"><span>00:00</span><span>00:02</span><span>00:04</span><span>00:06</span><span>{String(spec.durationSeconds).padStart(2, "0")}:00</span></div>
             <div className="track-row"><div className="track-label">MOTION</div><div className="track-lane"><div className="track-clip" style={{ width: "100%" }}><span>Intro / {PRESET_META[spec.preset].name}</span><span className="track-clip-end">{spec.durationSeconds}s</span></div></div></div>
             <div className="track-row"><div className="track-label">TYPE</div><div className="track-lane"><div className="track-clip track-clip-type" style={{ width: "76%" }}><span>{spec.title || "Untitled"}</span></div></div></div>
-            <div className="timeline-bottom"><span><Clock3 size={12}/> 30 frames / second</span><span>Composition updates live <span className="live-dot" /></span></div>
+            <div className="track-row"><div className="track-label">KEYFRAME</div><div className="track-lane"><div className="track-clip track-clip-type" style={{ width: Math.min(100, spec.titleStartFrame / Math.max(1, frameCount) * 100) + "%", minWidth: 5 }}><span>Title start · frame {spec.titleStartFrame}</span></div></div></div>
+          <div className="timeline-bottom"><span><Clock3 size={12}/> 30 frames / second</span><span>Composition updates live <span className="live-dot" /></span></div>
           </div>
         </section>
 
         <aside className="right-panel">
           <div className="right-panel-heading"><div><span className="eyebrow">04 / PROPERTIES</span><h2>Fine-tune</h2></div><span className="icon-square"><Settings2 size={16}/></span></div>
           <p className="muted small">Edits are reflected in the preview instantly.</p>
+          <div className="property-section">
+            <span className="property-heading">Project</span>
+            <label className="control-label" htmlFor="project-name">Project name</label>
+            <input id="project-name" className="control-input" value={projectName} maxLength={80} onChange={(event) => setProjectName(event.target.value)} />
+          </div>
           <div className="property-section">
             <span className="property-heading">Typography</span>
             <label className="control-label" htmlFor="eyebrow">Eyebrow</label>
@@ -250,6 +280,14 @@ export function MotionEditor() {
                 <input id={`color-${key}`} type="color" value={spec[key]} onChange={(event) => update(key, event.target.value)} aria-label={label + " color"} />
               </label>
             ))}
+          </div>
+          <div className="property-section">
+            <span className="property-heading">Title keyframes</span>
+            <label className="range-label" htmlFor="title-start-frame"><span>Entrance frame</span><strong>{spec.titleStartFrame}f / {frameCount}f</strong></label>
+            <input id="title-start-frame" className="range-input" type="range" min="0" max={Math.min(120, Math.max(0, frameCount - 1))} step="1" value={Math.min(spec.titleStartFrame, Math.min(120, Math.max(0, frameCount - 1)))} onChange={(event) => update("titleStartFrame", Number(event.target.value))} />
+            <label className="range-label" htmlFor="title-travel"><span>Entrance travel</span><strong>{spec.titleTravel}px</strong></label>
+            <input id="title-travel" className="range-input" type="range" min="0" max="160" step="4" value={spec.titleTravel} onChange={(event) => update("titleTravel", Number(event.target.value))} />
+            <p className="settings-hint">Adjust the title entrance timing and travel distance.</p>
           </div>
           <div className="property-section motion-summary">
             <span className="property-heading">Motion settings</span>

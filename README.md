@@ -53,7 +53,7 @@ npm run build
 ## Provider compatibility notes
 
 - **Google Antigravity:** use the Google Gemini API option with a Gemini API key from Google AI Studio, or a separate OpenAI-compatible gateway you are authorized to use. This app does not reuse Antigravity consumer-account OAuth/session tokens. Google's Antigravity FAQ warns that routing its consumer login through third-party software can violate its Terms of Service and risk account suspension: https://www.antigravity.google/docs/faq/.
-- **ChatGPT / Codex sign-in:** this version does not yet implement Sign in with ChatGPT or reuse local Codex CLI credentials. OpenAI's supported sign-in/plan-sharing flow requires an eligible registered integration; do not paste `~/.codex/auth.json` tokens into this app. For now, use an OpenAI API key or a provider endpoint you are authorized to use. See https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites and https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server.
+- **ChatGPT / Codex sign-in:** the hosted Vercel backend does not accept or store ChatGPT-plan OAuth tokens. Official plan-backed usage requires a user-controlled local runtime and separate plan-use authorization; do not paste `~/.codex/auth.json` tokens into this app. The local-companion architecture and implementation checklist are documented in [docs/chatgpt-codex-local-companion.md](docs/chatgpt-codex-local-companion.md). This integration is not implemented yet. For now, use an OpenAI API key or a provider endpoint you are authorized to use. See https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites and https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server.
 
 ## Export notes
 
