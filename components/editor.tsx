@@ -46,7 +46,7 @@ export function MotionEditor() {
   const [history, setHistory] = useState<MotionSpec[]>([]);
   const [future, setFuture] = useState<MotionSpec[]>([]);
   const [layers, setLayers] = useState({ background: true, graphics: true, typography: true, footer: true });
-  const [savedProjects, setSavedProjects] = useState<{ id: string; name: string; aspect: "16:9" | "9:16" | "1:1"; spec: MotionSpec; updatedAt: number }[]>([]);
+  const [savedProjects, setSavedProjects] = useState<{ id: string; name: string; aspect: "16:9" | "9:16" | "1:1"; fps: 24 | 30 | 60; layers: { background: boolean; graphics: boolean; typography: boolean; footer: boolean }; spec: MotionSpec; updatedAt: number }[]>([]);
   const [customPresets, setCustomPresets] = useState<{ id: string; name: string; spec: MotionSpec }[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
   const [libraryLoaded, setLibraryLoaded] = useState(false);
@@ -76,11 +76,11 @@ export function MotionEditor() {
   }
   function undo() { if (!history.length) return; setFuture((items) => [spec, ...items].slice(0, 40)); setSpec(history[history.length - 1]); setHistory((items) => items.slice(0, -1)); }
   function redo() { if (!future.length) return; setHistory((items) => [...items.slice(-39), spec]); setSpec(future[0]); setFuture((items) => items.slice(1)); }
-  function saveToLibrary(name = projectName) { const cleanName = name.trim().slice(0, 80) || "Untitled Motion"; setSavedProjects((items) => [{ id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now()), name: cleanName, aspect, spec, updatedAt: Date.now() }, ...items.filter((item) => item.name !== cleanName)].slice(0, 20)); setMessage({ type: "success", text: "Project saved to this browser." }); }
+  function saveToLibrary(name = projectName) { const cleanName = name.trim().slice(0, 80) || "Untitled Motion"; setSavedProjects((items) => [{ id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now()), name: cleanName, aspect, fps, layers, spec, updatedAt: Date.now() }, ...items.filter((item) => item.name !== cleanName)].slice(0, 20)); setMessage({ type: "success", text: "Project saved to this browser." }); }
   function duplicateProject() { const nextName = `${projectName.trim() || "Untitled Motion"} copy`.slice(0, 80); setProjectName(nextName); saveToLibrary(nextName); }
   function saveCustomPreset() { const name = window.prompt("Name this custom motion preset", PRESET_META[spec.preset].name + " custom"); if (!name?.trim()) return; const cleanName = name.trim().slice(0, 40); setCustomPresets((items) => [{ id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now()), name: cleanName, spec }, ...items.filter((item) => item.name !== cleanName)].slice(0, 30)); setMessage({ type: "success", text: "Custom preset saved." }); }
-  function loadSavedProject(item: { name: string; aspect: "16:9" | "9:16" | "1:1"; spec: MotionSpec }) { setHistory((items) => [...items.slice(-39), spec]); setFuture([]); setSpec(normalizeSpec(item.spec)); setProjectName(item.name); setAspect(item.aspect); setMessage({ type: "success", text: "Saved project restored." }); }
-  function saveProject() { saveToLibrary(); const blob = new Blob([JSON.stringify({ version: 1, name: projectName, aspect, spec }, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = (projectName.trim() || "motion-project").replace(/[^a-z0-9-_]+/gi, "-").toLowerCase() + ".json"; link.click(); URL.revokeObjectURL(url); setMessage({ type: "success", text: "Project file exported." }); }
+  function loadSavedProject(item: { name: string; aspect: "16:9" | "9:16" | "1:1"; fps?: 24 | 30 | 60; layers?: { background: boolean; graphics: boolean; typography: boolean; footer: boolean }; spec: MotionSpec }) { setHistory((items) => [...items.slice(-39), spec]); setFuture([]); setSpec(normalizeSpec(item.spec)); setProjectName(item.name); setAspect(item.aspect); if (item.fps === 24 || item.fps === 30 || item.fps === 60) setFps(item.fps); if (item.layers) setLayers(item.layers); setMessage({ type: "success", text: "Saved project restored." }); }
+  function saveProject() { saveToLibrary(); const blob = new Blob([JSON.stringify({ version: 1, name: projectName, aspect, fps, layers, spec }, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = (projectName.trim() || "motion-project").replace(/[^a-z0-9-_]+/gi, "-").toLowerCase() + ".json"; link.click(); URL.revokeObjectURL(url); setMessage({ type: "success", text: "Project file exported." }); }
   async function loadProject(file?: File) {
     if (!file) return;
     try {
@@ -97,7 +97,7 @@ export function MotionEditor() {
         throw new Error("Invalid project file.");
       }
 
-      const data = parsed as { version?: unknown; name?: unknown; aspect?: unknown; spec?: unknown };
+      const data = parsed as { version?: unknown; name?: unknown; aspect?: unknown; fps?: unknown; layers?: unknown; spec?: unknown };
       if (data.version !== 1) throw new Error("Unsupported project version. Import a Motion Generator v1 project.");
       if (!data.spec || typeof data.spec !== "object" || Array.isArray(data.spec)) {
         throw new Error("Project is missing a valid motion spec.");
@@ -127,6 +127,8 @@ export function MotionEditor() {
       setSpec(nextSpec);
       setProjectName(nextName || "Untitled Motion");
       setAspect(data.aspect);
+      if (data.fps === 24 || data.fps === 30 || data.fps === 60) setFps(data.fps);
+      if (data.layers && typeof data.layers === "object" && !Array.isArray(data.layers)) { const savedLayers = data.layers as Record<string, unknown>; setLayers({ background: savedLayers.background !== false, graphics: savedLayers.graphics !== false, typography: savedLayers.typography !== false, footer: savedLayers.footer !== false }); }
       setMessage({ type: "success", text: "Project loaded." });
     } catch (error) {
       setMessage({ type: "error", text: error instanceof Error ? error.message : "Could not load project file." });
