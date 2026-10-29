@@ -67,7 +67,7 @@ export function MotionComposition({ spec, layers = DEFAULT_LAYERS }: MotionCompo
         </div>
       </div>
 
-      <div style={{ display: layers.footer ? "flex" : "none", position: "absolute", bottom: "9%", left: "9%", right: "9%", display: "flex", alignItems: "end", justifyContent: "space-between", opacity: fade }}>
+      <div style={{ display: layers.footer ? "flex" : "none", position: "absolute", bottom: "9%", left: "9%", right: "9%", alignItems: "end", justifyContent: "space-between", opacity: fade }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: "48%" }}>
           <div style={{ ...line(0.22), width: "100%" }} />
           <span style={{ fontSize: Math.max(9, width * 0.01), color: "rgba(255,255,255,.5)", letterSpacing: "0.15em", textTransform: "uppercase" }}>DESIGNED TO MOVE</span>
