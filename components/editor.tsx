@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Player } from "@remotion/player";
 import {
-  ArrowDownToLine, Check, ChevronDown, CircleHelp, Clapperboard, Clock3,
+  ArrowDownToLine, Check, ChevronDown, CircleHelp, Clapperboard, Clock3, FileDown, FileUp, Undo2, Redo2,
   Download, KeyRound, LoaderCircle, Monitor, RefreshCw,
   Settings2, Sparkles, WandSparkles, X,
 } from "lucide-react";
@@ -40,6 +40,12 @@ export function MotionEditor() {
   const [message, setMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
   const currentProvider = PROVIDERS.find((item) => item.id === provider) ?? PROVIDERS[0];
   const frameCount = spec.durationSeconds * 30;
+  const [aspect, setAspect] = useState<"16:9" | "9:16" | "1:1">("16:9");
+  const [projectName, setProjectName] = useState("Untitled Motion");
+  const [history, setHistory] = useState<MotionSpec[]>([]);
+  const [future, setFuture] = useState<MotionSpec[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dimensions = aspect === "9:16" ? { width: 1080, height: 1920 } : aspect === "1:1" ? { width: 1080, height: 1080 } : { width: 1920, height: 1080 };
   const inputProps = useMemo(() => ({ spec }), [spec]);
 
   function changeProvider(next: Provider) {
@@ -48,8 +54,13 @@ export function MotionEditor() {
   }
 
   function update<K extends keyof MotionSpec>(key: K, value: MotionSpec[K]) {
-    setSpec((current) => normalizeSpec({ ...current, [key]: value }));
+    setSpec((current) => { const next = normalizeSpec({ ...current, [key]: value }); if (JSON.stringify(current) !== JSON.stringify(next)) { setHistory((items) => [...items.slice(-39), current]); setFuture([]); } return next; });
   }
+  function undo() { if (!history.length) return; setFuture((items) => [spec, ...items].slice(0, 40)); setSpec(history[history.length - 1]); setHistory((items) => items.slice(0, -1)); }
+  function redo() { if (!future.length) return; setHistory((items) => [...items.slice(-39), spec]); setSpec(future[0]); setFuture((items) => items.slice(1)); }
+  function saveProject() { const blob = new Blob([JSON.stringify({ version: 1, name: projectName, aspect, spec }, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = (projectName.trim() || "motion-project").replace(/[^a-z0-9-_]+/gi, "-").toLowerCase() + ".json"; link.click(); URL.revokeObjectURL(url); setMessage({ type: "success", text: "Project file exported." }); }
+  async function loadProject(file?: File) { if (!file) return; try { if (file.size > 1000000) throw new Error("Project file is too large."); const data = JSON.parse(await file.text()) as { name?: unknown; aspect?: unknown; spec?: unknown }; if (!data.spec || typeof data.spec !== "object") throw new Error("Invalid project file."); setHistory((items) => [...items.slice(-39), spec]); setFuture([]); setSpec(normalizeSpec(data.spec as Partial<MotionSpec>)); if (typeof data.name === "string") setProjectName(data.name.slice(0, 80)); if (data.aspect === "16:9" || data.aspect === "9:16" || data.aspect === "1:1") setAspect(data.aspect); setMessage({ type: "success", text: "Project loaded." }); } catch (error) { setMessage({ type: "error", text: error instanceof Error ? error.message : "Could not load project file." }); } }
+  function applyTemplate(template: "launch" | "social" | "minimal") { const templates = { launch: { ...DEFAULT_SPEC, eyebrow: "NEW RELEASE / 2026", title: "Made to stand out.", subtitle: "A new perspective starts here.", preset: "neon" as MotionPreset, accent: "#c6ff55", secondary: "#8b7cff" }, social: { ...DEFAULT_SPEC, eyebrow: "CREATOR SERIES / 001", title: "Make some noise.", subtitle: "Ideas worth stopping for.", preset: "kinetic" as MotionPreset, accent: "#ff765d", secondary: "#ffd166" }, minimal: { ...DEFAULT_SPEC, eyebrow: "STUDIO NOTES / 001", title: "Less, but better.", subtitle: "Clarity in every frame.", preset: "editorial" as MotionPreset, background: "#e9e7dd", accent: "#272822", secondary: "#9eaa87" } }; setHistory((items) => [...items.slice(-39), spec]); setFuture([]); setSpec(normalizeSpec(templates[template])); setMessage({ type: "success", text: "Template applied." }); }
 
   async function generate() {
     if (provider !== "custom" && !apiKey.trim()) {
@@ -129,7 +140,8 @@ export function MotionEditor() {
           <span>motion<span className="brand-slash">/</span>studio</span>
           <span className="beta-pill">BETA</span>
         </Link>
-        <div className="topbar-center"><span className="live-dot" /> LOCAL PROJECT <span className="topbar-divider">/</span> UNTITLED MOTION 01</div>
+        <div className="topbar-center"><span className="live-dot" /> LOCAL PROJECT <span className="topbar-divider">/</span> {projectName.toUpperCase()}</div>
+        <div className="topbar-actions"><button className="button button-quiet" onClick={undo} disabled={!history.length} title="Undo"><Undo2 size={15}/></button><button className="button button-quiet" onClick={redo} disabled={!future.length} title="Redo"><Redo2 size={15}/></button><button className="button button-quiet" onClick={saveProject} title="Save project"><FileDown size={15}/><span>Save</span></button><button className="button button-quiet" onClick={() => fileInputRef.current?.click()} title="Open project"><FileUp size={15}/><span>Open</span></button><input ref={fileInputRef} type="file" accept="application/json,.json" hidden onChange={(event) => { void loadProject(event.target.files?.[0]); event.currentTarget.value = ""; }}/></div>
         <div className="topbar-actions">
           <button className="button button-quiet button-settings" onClick={() => setSettingsOpen((open) => !open)}><KeyRound size={15} /> <span>AI settings</span> <ChevronDown size={13} /></button>
           <button className="button button-primary export-button" onClick={exportVideo} disabled={exporting}>
