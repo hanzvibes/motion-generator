@@ -39,9 +39,9 @@ export function MotionEditor() {
   const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
   const currentProvider = PROVIDERS.find((item) => item.id === provider) ?? PROVIDERS[0];
-  const frameCount = spec.durationSeconds * fps;
   const [aspect, setAspect] = useState<"16:9" | "9:16" | "1:1">("16:9");
   const [fps, setFps] = useState<24 | 30 | 60>(30);
+  const frameCount = spec.durationSeconds * fps;
   const [projectName, setProjectName] = useState("Untitled Motion");
   const [history, setHistory] = useState<MotionSpec[]>([]);
   const [future, setFuture] = useState<MotionSpec[]>([]);
