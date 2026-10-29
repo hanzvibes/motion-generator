@@ -238,7 +238,7 @@ export function MotionEditor() {
           </div>
           <p className="muted intro-copy">Describe the feeling. Let AI shape the first frame, then fine-tune the details.</p>
 
-          <div className="field-label-row"><label htmlFor="prompt">Your idea</label><button className="button button-small" onClick={() => setPrompt((value) => { const brief = value.trim().replace(/[.\\s]+$/, ""); const guidance = "Create a polished motion graphic with a clear visual hierarchy, intentional negative space, strong typography, cohesive colors, and a readable opening-to-ending sequence. Avoid clutter and keep the main message legible at mobile size."; return (brief ? `${brief}. ${guidance}` : guidance).slice(0, 1200); })}>Improve brief</button><span className="tiny-count">{prompt.length}/1200</span></div>
+          <div className="field-label-row"><label htmlFor="prompt">Your idea</label><button className="button button-small" onClick={() => setPrompt((value) => { const brief = value.trim().replace(/[.\s]+$/, ""); const guidance = "Create a polished motion graphic with a clear visual hierarchy, intentional negative space, strong typography, cohesive colors, and a readable opening-to-ending sequence. Avoid clutter and keep the main message legible at mobile size."; return (brief ? `${brief}. ${guidance}` : guidance).slice(0, 1200); })}>Improve brief</button><span className="tiny-count">{prompt.length}/1200</span></div>
           <textarea id="prompt" value={prompt} maxLength={1200} onChange={(event) => setPrompt(event.target.value)} className="prompt-input" placeholder="A bold launch animation for…"/>
           <div className="starter-row">
             {STARTER_PROMPTS.slice(0, 3).map((item) => (
