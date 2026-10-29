@@ -73,7 +73,7 @@ export function MotionEditor() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({ provider, apiKey: apiKey.trim() || "not-needed", baseURL: baseURL.trim(), model: model.trim(), prompt: prompt.trim() }),
+        body: JSON.stringify({ provider, apiKey: apiKey.trim(), baseURL: baseURL.trim(), model: model.trim(), prompt: prompt.trim() }),
       });
       const data = (await response.json()) as { spec?: Partial<MotionSpec>; error?: string };
       if (!response.ok || !data.spec) throw new Error(data.error ?? "Generate failed.");
